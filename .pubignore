@@ -20,3 +20,6 @@ package-lock.json
 # Ignore large resource files
 *.png
 *.jpg
+
+# Ignore vendored native source and its build/release metadata
+vendor/

@@ -1,6 +1,8 @@
 # duckdbexplorer
 
-A new Flutter project.
+This existing, tracked Flutter application is the consumer for later MyBusz
+integration work. Use this application rather than creating a duplicate
+example.
 
 ## Getting Started
 
