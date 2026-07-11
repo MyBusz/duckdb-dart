@@ -35,8 +35,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          command -v sdkmanager
-          sdkmanager --install "ndk;28.2.13676358" "cmake;3.22.1"
+          sdkmanager="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$sdkmanager"
+          "$sdkmanager" --install "ndk;28.2.13676358" "cmake;3.22.1"
           test -x "$ANDROID_SDK_ROOT/cmake/3.22.1/bin/cmake"
           test -x "$ANDROID_SDK_ROOT/cmake/3.22.1/bin/ninja"
           test -f "$ANDROID_SDK_ROOT/ndk/28.2.13676358/source.properties"

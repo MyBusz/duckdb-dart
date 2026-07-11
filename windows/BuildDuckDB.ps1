@@ -248,7 +248,7 @@ $AllowedDependents = @(
     "BCRYPT.DLL",
     "KERNEL32.DLL",
     "OLE32.DLL",
-    "RSTRMGR.DLL",
+    "RSTRTMGR.DLL",
     "SHELL32.DLL",
     "USER32.DLL",
     "WS2_32.DLL"

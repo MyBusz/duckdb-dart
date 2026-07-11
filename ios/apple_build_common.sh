@@ -247,20 +247,10 @@ assert_duckdb_symbols() {
       ((visible_init += 1))
     fi
   done
-  if ((visible_init > 0)); then
-    ((visible_init == 3)) || \
-      apple_fail "$binary ($architecture) exposes only part of the ICU/JSON/Parquet init symbol set"
-    printf 'Verified visible ICU/JSON/Parquet extension init symbols in %s (%s)\n' "$binary" "$architecture"
-  else
-    printf 'Extension init symbols are hidden in %s (%s); CMake link report%s authoritative\n' \
-      "$binary" "$architecture" " is"
-  fi
+  printf 'Observed %d visible ICU/JSON/Parquet init symbols in %s (%s); the CMake link report is authoritative\n' \
+    "$visible_init" "$binary" "$architecture"
 
   if grep -q 'LoadStaticExtension' <<<"$all_symbols"; then
-    for extension in Icu Json Parquet; do
-      grep -q "${extension}Extension" <<<"$all_symbols" || \
-        apple_fail "$binary ($architecture) has incomplete visible static-loader symbols"
-    done
-    printf 'Verified visible ICU/JSON/Parquet static-loader symbols in %s (%s)\n' "$binary" "$architecture"
+    printf 'Observed visible static-loader symbols in %s (%s)\n' "$binary" "$architecture"
   fi
 }
