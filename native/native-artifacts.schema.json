@@ -2,27 +2,87 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/MyBusz/duckdb-dart/blob/mybusz/1.4.4-duckdb-1.4.2/native/native-artifacts.schema.json",
   "title": "DuckDB 1.4.2 native artifact lock manifest",
-  "$comment": "Domain validation MUST perform the cross-field, archive-content, binary-inspection, workflow-constant, and release-attestation checks documented in native/README.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
-    "duckdbVersion",
+    "releaseTag",
     "sourceCommit",
     "coreCommit",
-    "release",
-    "extensionPolicy",
+    "toolchains",
+    "staticExtensions",
+    "licenses",
     "artifacts"
   ],
   "properties": {
-    "schemaVersion": { "const": 2 },
-    "duckdbVersion": { "const": "1.4.2" },
+    "schemaVersion": { "const": 1 },
+    "releaseTag": { "const": "native-duckdb-1.4.2-r1" },
     "sourceCommit": { "$ref": "#/$defs/gitCommit" },
     "coreCommit": {
       "const": "68d7555f68bd25c1a251ccca2e6338949c33986a"
     },
-    "release": { "$ref": "#/$defs/release" },
-    "extensionPolicy": { "$ref": "#/$defs/extensionPolicy" },
+    "toolchains": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flutter", "dart", "androidNdk", "buildTools"],
+      "properties": {
+        "flutter": { "const": "3.41.3" },
+        "dart": { "const": "3.11.1" },
+        "androidNdk": { "const": "28.2.13676358" },
+        "buildTools": {
+          "type": "array",
+          "prefixItems": [
+            { "$ref": "#/$defs/cmakeTool" },
+            { "$ref": "#/$defs/ninjaTool" },
+            { "$ref": "#/$defs/linuxClangTool" },
+            { "$ref": "#/$defs/xcodeTool" },
+            { "$ref": "#/$defs/appleClangTool" },
+            { "$ref": "#/$defs/visualStudioTool" },
+            { "$ref": "#/$defs/msvcTool" }
+          ],
+          "items": false,
+          "minItems": 7,
+          "maxItems": 7
+        }
+      }
+    },
+    "staticExtensions": {
+      "type": "array",
+      "prefixItems": [
+        { "const": "icu" },
+        { "const": "parquet" },
+        { "const": "json" }
+      ],
+      "items": false,
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "licenses": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "identifier"],
+          "properties": {
+            "path": { "const": "LICENSE" },
+            "identifier": { "const": "MIT" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "identifier"],
+          "properties": {
+            "path": { "const": "licenses/duckdb/LICENSE" },
+            "identifier": { "const": "MIT" }
+          }
+        }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
     "artifacts": {
       "type": "array",
       "prefixItems": [
@@ -46,149 +106,11 @@
       "type": "string",
       "pattern": "^[0-9a-f]{64}$"
     },
-    "nonBlankString": {
-      "type": "string",
-      "pattern": "^(?=.*\\S).+$"
-    },
     "toolVersion": {
       "type": "string",
-      "$comment": "Numeric or semver-like only; arbitrary prose is forbidden.",
       "pattern": "^[0-9]+(?:\\.[0-9]+){0,3}(?:[-+][0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$"
     },
-    "normalizedRelativePosixPath": {
-      "type": "string",
-      "$comment": "A normalized relative POSIX path: no absolute or drive path, backslash, NUL, empty segment, dot segment, dot-dot segment, or traversal.",
-      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*\\u0000)(?!.*//)(?!\\.{1,2}(?:/|$))(?!.*(?:/\\.{1,2})(?:/|$))[^/]+(?:/[^/]+)*$"
-    },
-    "release": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "repository",
-        "candidateTag",
-        "finalTag",
-        "assets",
-        "sha256sumsEntries"
-      ],
-      "properties": {
-        "repository": { "const": "MyBusz/duckdb-dart" },
-        "candidateTag": {
-          "const": "native-candidate-duckdb-1.4.2-r1"
-        },
-        "finalTag": { "const": "native-duckdb-1.4.2-r1" },
-        "assets": {
-          "$comment": "The exact final release asset set: five payloads, fifteen companions, assets.lock.json, and SHA256SUMS.",
-          "type": "array",
-          "prefixItems": [
-            { "const": "duckdb-android-arm64-v8a-x86_64.zip" },
-            { "const": "duckdb-android-arm64-v8a-x86_64.zip.spdx.json" },
-            { "const": "duckdb-android-arm64-v8a-x86_64.zip.provenance.intoto.jsonl" },
-            { "const": "duckdb-android-arm64-v8a-x86_64.zip.sbom.intoto.jsonl" },
-            { "const": "duckdb-ios-xcframework.zip" },
-            { "const": "duckdb-ios-xcframework.zip.spdx.json" },
-            { "const": "duckdb-ios-xcframework.zip.provenance.intoto.jsonl" },
-            { "const": "duckdb-ios-xcframework.zip.sbom.intoto.jsonl" },
-            { "const": "duckdb-macos-universal.zip" },
-            { "const": "duckdb-macos-universal.zip.spdx.json" },
-            { "const": "duckdb-macos-universal.zip.provenance.intoto.jsonl" },
-            { "const": "duckdb-macos-universal.zip.sbom.intoto.jsonl" },
-            { "const": "duckdb-linux-x86_64.zip" },
-            { "const": "duckdb-linux-x86_64.zip.spdx.json" },
-            { "const": "duckdb-linux-x86_64.zip.provenance.intoto.jsonl" },
-            { "const": "duckdb-linux-x86_64.zip.sbom.intoto.jsonl" },
-            { "const": "duckdb-windows-x64.zip" },
-            { "const": "duckdb-windows-x64.zip.spdx.json" },
-            { "const": "duckdb-windows-x64.zip.provenance.intoto.jsonl" },
-            { "const": "duckdb-windows-x64.zip.sbom.intoto.jsonl" },
-            { "const": "assets.lock.json" },
-            { "const": "SHA256SUMS" }
-          ],
-          "items": false,
-          "minItems": 22,
-          "maxItems": 22
-        },
-        "sha256sumsEntries": {
-          "$comment": "Exact SHA256SUMS filename coverage, excluding SHA256SUMS itself.",
-          "type": "array",
-          "prefixItems": [
-            { "const": "duckdb-android-arm64-v8a-x86_64.zip" },
-            { "const": "duckdb-android-arm64-v8a-x86_64.zip.spdx.json" },
-            { "const": "duckdb-android-arm64-v8a-x86_64.zip.provenance.intoto.jsonl" },
-            { "const": "duckdb-android-arm64-v8a-x86_64.zip.sbom.intoto.jsonl" },
-            { "const": "duckdb-ios-xcframework.zip" },
-            { "const": "duckdb-ios-xcframework.zip.spdx.json" },
-            { "const": "duckdb-ios-xcframework.zip.provenance.intoto.jsonl" },
-            { "const": "duckdb-ios-xcframework.zip.sbom.intoto.jsonl" },
-            { "const": "duckdb-macos-universal.zip" },
-            { "const": "duckdb-macos-universal.zip.spdx.json" },
-            { "const": "duckdb-macos-universal.zip.provenance.intoto.jsonl" },
-            { "const": "duckdb-macos-universal.zip.sbom.intoto.jsonl" },
-            { "const": "duckdb-linux-x86_64.zip" },
-            { "const": "duckdb-linux-x86_64.zip.spdx.json" },
-            { "const": "duckdb-linux-x86_64.zip.provenance.intoto.jsonl" },
-            { "const": "duckdb-linux-x86_64.zip.sbom.intoto.jsonl" },
-            { "const": "duckdb-windows-x64.zip" },
-            { "const": "duckdb-windows-x64.zip.spdx.json" },
-            { "const": "duckdb-windows-x64.zip.provenance.intoto.jsonl" },
-            { "const": "duckdb-windows-x64.zip.sbom.intoto.jsonl" },
-            { "const": "assets.lock.json" }
-          ],
-          "items": false,
-          "minItems": 21,
-          "maxItems": 21
-        }
-      }
-    },
-    "extensionPolicy": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["staticallyLinked", "autoload", "autoinstall", "loadable"],
-      "properties": {
-        "staticallyLinked": {
-          "$ref": "#/$defs/staticExtensions"
-        },
-        "autoload": { "const": false },
-        "autoinstall": { "const": false },
-        "loadable": { "const": false }
-      }
-    },
-    "staticExtensions": {
-      "type": "array",
-      "prefixItems": [
-        { "const": "icu" },
-        { "const": "parquet" },
-        { "const": "json" }
-      ],
-      "items": false,
-      "minItems": 3,
-      "maxItems": 3
-    },
-    "archive": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["fileName", "size", "sha256"],
-      "properties": {
-        "fileName": { "$ref": "#/$defs/nonBlankString" },
-        "size": { "type": "integer", "minimum": 1 },
-        "sha256": { "$ref": "#/$defs/sha256" }
-      }
-    },
-    "member": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["path", "installPath", "size", "sha256", "executable"],
-      "properties": {
-        "path": { "$ref": "#/$defs/normalizedRelativePosixPath" },
-        "installPath": {
-          "$ref": "#/$defs/normalizedRelativePosixPath",
-          "$comment": "Domain validation correlates the target prefix and suffix to path."
-        },
-        "size": { "type": "integer", "minimum": 1 },
-        "sha256": { "$ref": "#/$defs/sha256" },
-        "executable": { "type": "boolean" }
-      }
-    },
-    "toolchain": {
+    "buildTool": {
       "type": "object",
       "additionalProperties": false,
       "required": ["name", "version"],
@@ -197,732 +119,195 @@
         "version": { "$ref": "#/$defs/toolVersion" }
       }
     },
-    "androidToolchains": {
-      "type": "array",
-      "prefixItems": [
-        {
-          "allOf": [
-            { "$ref": "#/$defs/toolchain" },
-            {
-              "properties": {
-                "name": { "const": "android-ndk" },
-                "version": { "const": "28.2.13676358" }
-              }
-            }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/toolchain" },
-            { "properties": { "name": { "const": "cmake" } } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/toolchain" },
-            { "properties": { "name": { "const": "ninja" } } }
-          ]
-        }
-      ],
-      "items": false,
-      "minItems": 3,
-      "maxItems": 3,
-      "uniqueItems": true
-    },
-    "appleToolchains": {
-      "type": "array",
-      "prefixItems": [
-        {
-          "allOf": [
-            { "$ref": "#/$defs/toolchain" },
-            { "properties": { "name": { "const": "xcode" } } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/toolchain" },
-            { "properties": { "name": { "const": "cmake" } } }
-          ]
-        }
-      ],
-      "items": false,
-      "minItems": 2,
-      "maxItems": 2,
-      "uniqueItems": true
-    },
-    "linuxToolchains": {
-      "type": "array",
-      "prefixItems": [
-        {
-          "allOf": [
-            { "$ref": "#/$defs/toolchain" },
-            { "properties": { "name": { "const": "clang" } } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/toolchain" },
-            { "properties": { "name": { "const": "cmake" } } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/toolchain" },
-            { "properties": { "name": { "const": "ninja" } } }
-          ]
-        }
-      ],
-      "items": false,
-      "minItems": 3,
-      "maxItems": 3,
-      "uniqueItems": true
-    },
-    "windowsToolchains": {
-      "type": "array",
-      "prefixItems": [
-        {
-          "allOf": [
-            { "$ref": "#/$defs/toolchain" },
-            { "properties": { "name": { "const": "visual-studio-2022" } } }
-          ]
-        },
-        {
-          "allOf": [
-            { "$ref": "#/$defs/toolchain" },
-            { "properties": { "name": { "const": "cmake" } } }
-          ]
-        }
-      ],
-      "items": false,
-      "minItems": 2,
-      "maxItems": 2,
-      "uniqueItems": true
-    },
-    "flagArray": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/nonBlankString" },
-      "minItems": 1,
-      "uniqueItems": true
-    },
-    "posixCompileFlags": {
+    "cmakeTool": {
       "allOf": [
-        { "$ref": "#/$defs/flagArray" },
-        {
-          "prefixItems": [
-            { "const": "-fPIC" },
-            { "const": "-fstack-protector-strong" },
-            { "const": "-D_FORTIFY_SOURCE=2" }
-          ],
-          "items": false,
-          "minItems": 3,
-          "maxItems": 3
-        }
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "cmake" } } }
       ]
     },
-    "posixLinkFlags": {
+    "ninjaTool": {
       "allOf": [
-        { "$ref": "#/$defs/flagArray" },
-        {
-          "prefixItems": [
-            { "const": "-Wl,-z,relro" },
-            { "const": "-Wl,-z,now" }
-          ],
-          "items": false,
-          "minItems": 2,
-          "maxItems": 2
-        }
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "ninja" } } }
       ]
     },
-    "androidLinkFlags": {
+    "linuxClangTool": {
       "allOf": [
-        { "$ref": "#/$defs/flagArray" },
-        {
-          "prefixItems": [
-            { "const": "-Wl,-z,relro" },
-            { "const": "-Wl,-z,now" },
-            { "const": "-Wl,-z,max-page-size=16384" },
-            { "const": "-Wl,-z,common-page-size=16384" }
-          ],
-          "items": false,
-          "minItems": 4,
-          "maxItems": 4
-        }
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "linux-clang" } } }
       ]
     },
-    "appleLinkFlags": {
+    "xcodeTool": {
       "allOf": [
-        { "$ref": "#/$defs/flagArray" },
-        {
-          "prefixItems": [
-            { "const": "-Wl,-dead_strip" },
-            { "const": "-Wl,-fatal_warnings" }
-          ],
-          "items": false,
-          "minItems": 2,
-          "maxItems": 2
-        }
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "xcode" } } }
       ]
     },
-    "windowsCompileFlags": {
+    "appleClangTool": {
       "allOf": [
-        { "$ref": "#/$defs/flagArray" },
-        {
-          "prefixItems": [
-            { "const": "/guard:cf" },
-            { "const": "/sdl" }
-          ],
-          "items": false,
-          "minItems": 2,
-          "maxItems": 2
-        }
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "apple-clang" } } }
       ]
     },
-    "windowsLinkFlags": {
+    "visualStudioTool": {
       "allOf": [
-        { "$ref": "#/$defs/flagArray" },
-        {
-          "prefixItems": [
-            { "const": "/DYNAMICBASE" },
-            { "const": "/NXCOMPAT" }
-          ],
-          "items": false,
-          "minItems": 2,
-          "maxItems": 2
-        }
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "visual-studio" } } }
       ]
     },
-    "commonNativeOptions": {
+    "msvcTool": {
+      "allOf": [
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "msvc" } } }
+      ]
+    },
+    "relativePath": {
+      "type": "string",
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*\\\\)(?!.*\\u0000)(?!.*//)(?!\\.{1,2}(?:/|$))(?!.*(?:/\\.{1,2})(?:/|$))[^/]+(?:/[^/]+)*$"
+    },
+    "member": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "target",
-        "configuration",
-        "sourceRoot",
-        "staticExtensions",
-        "internalIcu",
-        "extensionLoad",
-        "extensionAutoLoad",
-        "extensionAutoInstall",
-        "buildShell",
-        "buildUnitTests",
-        "buildBenchmarks"
-      ],
+      "required": ["path", "size", "sha256", "installDestination"],
       "properties": {
-        "target": { "const": "duckdb" },
-        "configuration": { "const": "Release" },
-        "sourceRoot": { "const": "vendor/duckdb" },
-        "staticExtensions": { "$ref": "#/$defs/staticExtensions" },
-        "internalIcu": { "const": true },
-        "extensionLoad": { "const": false },
-        "extensionAutoLoad": { "const": false },
-        "extensionAutoInstall": { "const": false },
-        "buildShell": { "const": false },
-        "buildUnitTests": { "const": false },
-        "buildBenchmarks": { "const": false }
-      }
-    },
-    "commonBuildVariant": {
-      "type": "object",
-      "required": ["id", "nativeOptions", "compileFlags", "linkFlags"],
-      "properties": {
-        "id": { "$ref": "#/$defs/nonBlankString" },
-        "nativeOptions": { "$ref": "#/$defs/commonNativeOptions" },
-        "compileFlags": { "$ref": "#/$defs/flagArray" },
-        "linkFlags": { "$ref": "#/$defs/flagArray" }
-      }
-    },
-    "androidArm64Variant": {
-      "allOf": [
-        { "$ref": "#/$defs/commonBuildVariant" },
-        {
-          "type": "object",
-          "required": ["systemName", "abi", "api", "ndkVersion", "stl"],
-          "properties": {
-            "id": { "const": "arm64-v8a" },
-            "systemName": { "const": "Android" },
-            "abi": { "const": "arm64-v8a" },
-            "api": { "const": "android-21" },
-            "ndkVersion": { "const": "28.2.13676358" },
-            "stl": { "const": "c++_static" },
-            "compileFlags": { "$ref": "#/$defs/posixCompileFlags" },
-            "linkFlags": { "$ref": "#/$defs/androidLinkFlags" }
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "androidX64Variant": {
-      "allOf": [
-        { "$ref": "#/$defs/commonBuildVariant" },
-        {
-          "type": "object",
-          "required": ["systemName", "abi", "api", "ndkVersion", "stl"],
-          "properties": {
-            "id": { "const": "x86_64" },
-            "systemName": { "const": "Android" },
-            "abi": { "const": "x86_64" },
-            "api": { "const": "android-21" },
-            "ndkVersion": { "const": "28.2.13676358" },
-            "stl": { "const": "c++_static" },
-            "compileFlags": { "$ref": "#/$defs/posixCompileFlags" },
-            "linkFlags": { "$ref": "#/$defs/androidLinkFlags" }
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "iosDeviceVariant": {
-      "allOf": [
-        { "$ref": "#/$defs/commonBuildVariant" },
-        {
-          "type": "object",
-          "required": ["sdk", "architecture", "minimumOsVersion"],
-          "properties": {
-            "id": { "const": "device-arm64" },
-            "sdk": { "const": "iphoneos" },
-            "architecture": { "const": "arm64" },
-            "minimumOsVersion": { "const": "13.0" },
-            "compileFlags": { "$ref": "#/$defs/posixCompileFlags" },
-            "linkFlags": { "$ref": "#/$defs/appleLinkFlags" }
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "iosSimulatorArm64Variant": {
-      "allOf": [
-        { "$ref": "#/$defs/commonBuildVariant" },
-        {
-          "type": "object",
-          "required": ["sdk", "architecture", "minimumOsVersion"],
-          "properties": {
-            "id": { "const": "simulator-arm64" },
-            "sdk": { "const": "iphonesimulator" },
-            "architecture": { "const": "arm64" },
-            "minimumOsVersion": { "const": "13.0" },
-            "compileFlags": { "$ref": "#/$defs/posixCompileFlags" },
-            "linkFlags": { "$ref": "#/$defs/appleLinkFlags" }
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "iosSimulatorX64Variant": {
-      "allOf": [
-        { "$ref": "#/$defs/commonBuildVariant" },
-        {
-          "type": "object",
-          "required": ["sdk", "architecture", "minimumOsVersion"],
-          "properties": {
-            "id": { "const": "simulator-x86_64" },
-            "sdk": { "const": "iphonesimulator" },
-            "architecture": { "const": "x86_64" },
-            "minimumOsVersion": { "const": "13.0" },
-            "compileFlags": { "$ref": "#/$defs/posixCompileFlags" },
-            "linkFlags": { "$ref": "#/$defs/appleLinkFlags" }
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "macosX64Variant": {
-      "allOf": [
-        { "$ref": "#/$defs/commonBuildVariant" },
-        {
-          "type": "object",
-          "required": ["sdk", "architecture", "minimumOsVersion"],
-          "properties": {
-            "id": { "const": "x86_64" },
-            "sdk": { "const": "macosx" },
-            "architecture": { "const": "x86_64" },
-            "minimumOsVersion": { "const": "10.15" },
-            "compileFlags": { "$ref": "#/$defs/posixCompileFlags" },
-            "linkFlags": { "$ref": "#/$defs/appleLinkFlags" }
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "macosArm64Variant": {
-      "allOf": [
-        { "$ref": "#/$defs/commonBuildVariant" },
-        {
-          "type": "object",
-          "required": ["sdk", "architecture", "minimumOsVersion"],
-          "properties": {
-            "id": { "const": "arm64" },
-            "sdk": { "const": "macosx" },
-            "architecture": { "const": "arm64" },
-            "minimumOsVersion": { "const": "11.0" },
-            "compileFlags": { "$ref": "#/$defs/posixCompileFlags" },
-            "linkFlags": { "$ref": "#/$defs/appleLinkFlags" }
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "linuxX64Variant": {
-      "allOf": [
-        { "$ref": "#/$defs/commonBuildVariant" },
-        {
-          "type": "object",
-          "required": ["systemName", "architecture"],
-          "properties": {
-            "id": { "const": "x86_64" },
-            "systemName": { "const": "Linux" },
-            "architecture": { "const": "x86_64" },
-            "compileFlags": { "$ref": "#/$defs/posixCompileFlags" },
-            "linkFlags": { "$ref": "#/$defs/posixLinkFlags" }
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "windowsX64Variant": {
-      "allOf": [
-        { "$ref": "#/$defs/commonBuildVariant" },
-        {
-          "type": "object",
-          "required": ["systemName", "architecture", "generatorPlatform"],
-          "properties": {
-            "id": { "const": "x64" },
-            "systemName": { "const": "Windows" },
-            "architecture": { "const": "AMD64" },
-            "generatorPlatform": { "const": "x64" },
-            "compileFlags": { "$ref": "#/$defs/windowsCompileFlags" },
-            "linkFlags": { "$ref": "#/$defs/windowsLinkFlags" }
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "subject": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["name", "sha256"],
-      "properties": {
-        "name": { "$ref": "#/$defs/nonBlankString" },
-        "sha256": { "$ref": "#/$defs/sha256" }
-      }
-    },
-    "sbomSource": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["repository", "sourceCommit", "coreCommit"],
-      "properties": {
-        "repository": { "const": "MyBusz/duckdb-dart" },
-        "sourceCommit": { "$ref": "#/$defs/gitCommit" },
-        "coreCommit": {
-          "const": "68d7555f68bd25c1a251ccca2e6338949c33986a"
-        }
-      }
-    },
-    "sbom": {
-      "type": "object",
-      "$comment": "Domain validation compares describes and source to the archive and top-level commits and inspects the SPDX document.",
-      "additionalProperties": false,
-      "required": [
-        "format",
-        "fileName",
-        "size",
-        "sha256",
-        "describes",
-        "source",
-        "extensions"
-      ],
-      "properties": {
-        "format": { "const": "SPDX-2.3-json" },
-        "fileName": { "$ref": "#/$defs/nonBlankString" },
+        "path": { "$ref": "#/$defs/relativePath" },
         "size": { "type": "integer", "minimum": 1 },
         "sha256": { "$ref": "#/$defs/sha256" },
-        "describes": { "$ref": "#/$defs/subject" },
-        "source": { "$ref": "#/$defs/sbomSource" },
-        "extensions": { "$ref": "#/$defs/staticExtensions" }
+        "installDestination": { "$ref": "#/$defs/relativePath" }
       }
     },
-    "sourceMaterial": {
+    "supportedPlatform": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "repository", "ref", "commit"],
+      "required": ["platform", "architectures"],
       "properties": {
-        "name": { "const": "source" },
-        "repository": { "const": "MyBusz/duckdb-dart" },
-        "ref": {
-          "const": "refs/tags/native-candidate-duckdb-1.4.2-r1"
-        },
-        "commit": { "$ref": "#/$defs/gitCommit" }
-      }
-    },
-    "coreMaterial": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["name", "repository", "commit"],
-      "properties": {
-        "name": { "const": "duckdb-core" },
-        "repository": { "const": "duckdb/duckdb" },
-        "commit": {
-          "const": "68d7555f68bd25c1a251ccca2e6338949c33986a"
-        }
-      }
-    },
-    "provenanceMaterials": {
-      "type": "array",
-      "prefixItems": [
-        { "$ref": "#/$defs/sourceMaterial" },
-        { "$ref": "#/$defs/coreMaterial" }
-      ],
-      "items": false,
-      "minItems": 2,
-      "maxItems": 2
-    },
-    "provenance": {
-      "type": "object",
-      "$comment": "Domain validation resolves sourceRef to top-level sourceCommit and compares every source/material commit and subject to top-level values and the archive.",
-      "additionalProperties": false,
-      "required": [
-        "format",
-        "fileName",
-        "size",
-        "sha256",
-        "trustedSignerWorkflow",
-        "invocationId",
-        "sourceRef",
-        "sourceCommit",
-        "materials",
-        "subject"
-      ],
-      "properties": {
-        "format": { "const": "slsa-provenance-v1-in-toto-jsonl" },
-        "fileName": { "$ref": "#/$defs/nonBlankString" },
-        "size": { "type": "integer", "minimum": 1 },
-        "sha256": { "$ref": "#/$defs/sha256" },
-        "trustedSignerWorkflow": {
-          "const": "MyBusz/duckdb-dart/.github/workflows/native-build.yml"
-        },
-        "invocationId": { "$ref": "#/$defs/nonBlankString" },
-        "sourceRef": {
-          "const": "refs/tags/native-candidate-duckdb-1.4.2-r1"
-        },
-        "sourceCommit": { "$ref": "#/$defs/gitCommit" },
-        "materials": { "$ref": "#/$defs/provenanceMaterials" },
-        "subject": { "$ref": "#/$defs/subject" }
-      }
-    },
-    "sbomPredicate": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["fileName", "sha256"],
-      "properties": {
-        "fileName": { "$ref": "#/$defs/nonBlankString" },
-        "sha256": { "$ref": "#/$defs/sha256" }
-      }
-    },
-    "sbomAttestation": {
-      "type": "object",
-      "$comment": "Domain validation binds subject to the archive and predicate to the sibling SPDX document.",
-      "additionalProperties": false,
-      "required": [
-        "format",
-        "fileName",
-        "size",
-        "sha256",
-        "subject",
-        "predicate"
-      ],
-      "properties": {
-        "format": { "const": "spdx-sbom-in-toto-jsonl" },
-        "fileName": { "$ref": "#/$defs/nonBlankString" },
-        "size": { "type": "integer", "minimum": 1 },
-        "sha256": { "$ref": "#/$defs/sha256" },
-        "subject": { "$ref": "#/$defs/subject" },
-        "predicate": { "$ref": "#/$defs/sbomPredicate" }
-      }
-    },
-    "artifactCommon": {
-      "type": "object",
-      "required": [
-        "target",
-        "archive",
-        "members",
-        "architectures",
-        "toolchains",
-        "buildVariants",
-        "sbom",
-        "provenance",
-        "sbomAttestation"
-      ],
-      "properties": {
-        "target": {
-          "type": "string",
-          "enum": ["android", "ios", "macos", "linux", "windows"]
-        },
-        "archive": { "$ref": "#/$defs/archive" },
-        "members": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/member" },
-          "minItems": 1
+        "platform": {
+          "enum": ["android", "ios", "ios-simulator", "macos", "linux", "windows"]
         },
         "architectures": {
           "type": "array",
-          "items": { "$ref": "#/$defs/nonBlankString" },
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9_-]+$" },
           "minItems": 1,
           "uniqueItems": true
         },
-        "toolchains": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/toolchain" },
-          "minItems": 1,
-          "uniqueItems": true
-        },
-        "buildVariants": {
-          "type": "array",
-          "minItems": 1,
-          "uniqueItems": true
-        },
-        "sbom": { "$ref": "#/$defs/sbom" },
-        "provenance": { "$ref": "#/$defs/provenance" },
-        "sbomAttestation": { "$ref": "#/$defs/sbomAttestation" }
-      }
-    },
-    "iosPackaging": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["steps"],
-      "properties": {
-        "steps": {
-          "type": "array",
-          "prefixItems": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["operation", "inputs", "output"],
-              "properties": {
-                "operation": { "const": "lipo" },
-                "inputs": {
-                  "type": "array",
-                  "prefixItems": [
-                    { "const": "simulator-arm64" },
-                    { "const": "simulator-x86_64" }
-                  ],
-                  "items": false,
-                  "minItems": 2,
-                  "maxItems": 2
-                },
-                "output": { "const": "simulator-arm64_x86_64" }
-              }
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["operation", "inputs", "output"],
-              "properties": {
-                "operation": { "const": "create-xcframework" },
-                "inputs": {
-                  "type": "array",
-                  "prefixItems": [
-                    { "const": "device-arm64" },
-                    { "const": "simulator-arm64_x86_64" }
-                  ],
-                  "items": false,
-                  "minItems": 2,
-                  "maxItems": 2
-                },
-                "output": { "const": "duckdb.xcframework" }
-              }
-            }
-          ],
-          "items": false,
-          "minItems": 2,
-          "maxItems": 2
+        "minimumOsVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+(?:\\.[0-9]+)*$"
         }
       }
     },
-    "macosPackaging": {
+    "artifact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["steps"],
+      "required": [
+        "target",
+        "fileName",
+        "size",
+        "sha256",
+        "supportedPlatforms",
+        "members"
+      ],
       "properties": {
-        "steps": {
+        "target": { "enum": ["android", "ios", "macos", "linux", "windows"] },
+        "fileName": { "type": "string" },
+        "size": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "supportedPlatforms": {
           "type": "array",
-          "prefixItems": [
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["operation", "inputs", "output"],
-              "properties": {
-                "operation": { "const": "lipo" },
-                "inputs": {
-                  "type": "array",
-                  "prefixItems": [
-                    { "const": "x86_64" },
-                    { "const": "arm64" }
-                  ],
-                  "items": false,
-                  "minItems": 2,
-                  "maxItems": 2
-                },
-                "output": { "const": "libduckdb.dylib" }
-              }
-            }
-          ],
-          "items": false,
+          "items": { "$ref": "#/$defs/supportedPlatform" },
+          "minItems": 1
+        },
+        "members": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/member" },
           "minItems": 1,
-          "maxItems": 1
+          "maxItems": 64,
+          "uniqueItems": true
         }
       }
     },
-    "iosBinaryInspection": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["xcframeworkInfoPlist", "machOSlices"],
-      "properties": {
-        "xcframeworkInfoPlist": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["path", "availableLibraries"],
+    "androidArtifact": {
+      "allOf": [
+        { "$ref": "#/$defs/artifact" },
+        {
           "properties": {
-            "path": { "const": "duckdb.xcframework/Info.plist" },
-            "availableLibraries": {
+            "target": { "const": "android" },
+            "fileName": { "const": "duckdb-android-arm64-v8a-x86_64.zip" },
+            "supportedPlatforms": {
               "type": "array",
               "prefixItems": [
                 {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": [
-                    "libraryIdentifier",
-                    "libraryPath",
-                    "supportedArchitectures",
-                    "supportedPlatform"
-                  ],
+                  "required": ["platform", "architectures", "minimumOsVersion"],
                   "properties": {
-                    "libraryIdentifier": { "const": "ios-arm64" },
-                    "libraryPath": { "const": "duckdb.framework" },
-                    "supportedArchitectures": {
+                    "platform": { "const": "android" },
+                    "architectures": {
+                      "type": "array",
+                      "prefixItems": [
+                        { "const": "arm64-v8a" },
+                        { "const": "x86_64" }
+                      ],
+                      "items": false,
+                      "minItems": 2,
+                      "maxItems": 2
+                    },
+                    "minimumOsVersion": { "const": "21" }
+                  }
+                }
+              ],
+              "items": false,
+              "minItems": 1,
+              "maxItems": 1
+            },
+            "members": {
+              "type": "array",
+              "prefixItems": [
+                { "$ref": "#/$defs/androidArm64Member" },
+                { "$ref": "#/$defs/androidX64Member" }
+              ],
+              "items": { "$ref": "#/$defs/member" },
+              "minItems": 2,
+              "maxItems": 64,
+              "uniqueItems": true
+            }
+          }
+        }
+      ]
+    },
+    "iosArtifact": {
+      "allOf": [
+        { "$ref": "#/$defs/artifact" },
+        {
+          "properties": {
+            "target": { "const": "ios" },
+            "fileName": { "const": "duckdb-ios-xcframework.zip" },
+            "supportedPlatforms": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["platform", "architectures", "minimumOsVersion"],
+                  "properties": {
+                    "platform": { "const": "ios" },
+                    "architectures": {
                       "type": "array",
                       "prefixItems": [{ "const": "arm64" }],
                       "items": false,
                       "minItems": 1,
                       "maxItems": 1
                     },
-                    "supportedPlatform": { "const": "ios" }
+                    "minimumOsVersion": { "const": "13.0" }
                   }
                 },
                 {
                   "type": "object",
                   "additionalProperties": false,
-                  "required": [
-                    "libraryIdentifier",
-                    "libraryPath",
-                    "supportedArchitectures",
-                    "supportedPlatform",
-                    "supportedPlatformVariant"
-                  ],
+                  "required": ["platform", "architectures", "minimumOsVersion"],
                   "properties": {
-                    "libraryIdentifier": {
-                      "const": "ios-arm64_x86_64-simulator"
-                    },
-                    "libraryPath": { "const": "duckdb.framework" },
-                    "supportedArchitectures": {
+                    "platform": { "const": "ios-simulator" },
+                    "architectures": {
                       "type": "array",
                       "prefixItems": [
                         { "const": "arm64" },
@@ -932,733 +317,244 @@
                       "minItems": 2,
                       "maxItems": 2
                     },
-                    "supportedPlatform": { "const": "ios" },
-                    "supportedPlatformVariant": { "const": "simulator" }
+                    "minimumOsVersion": { "const": "13.0" }
                   }
                 }
-              ],
-              "items": false,
-              "minItems": 2,
-              "maxItems": 2
-            }
-          }
-        },
-        "machOSlices": {
-          "type": "array",
-          "prefixItems": [
-            {
-              "$ref": "#/$defs/iosDeviceMachOSlice"
-            },
-            {
-              "$ref": "#/$defs/iosSimulatorArm64MachOSlice"
-            },
-            {
-              "$ref": "#/$defs/iosSimulatorX64MachOSlice"
-            }
-          ],
-          "items": false,
-          "minItems": 3,
-          "maxItems": 3
-        }
-      }
-    },
-    "machOSlice": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "binaryPath",
-        "architecture",
-        "platform",
-        "lcBuildVersionMinimum"
-      ],
-      "properties": {
-        "binaryPath": { "$ref": "#/$defs/normalizedRelativePosixPath" },
-        "architecture": { "$ref": "#/$defs/nonBlankString" },
-        "platform": { "$ref": "#/$defs/nonBlankString" },
-        "lcBuildVersionMinimum": { "$ref": "#/$defs/nonBlankString" }
-      }
-    },
-    "iosDeviceMachOSlice": {
-      "allOf": [
-        { "$ref": "#/$defs/machOSlice" },
-        {
-          "properties": {
-            "binaryPath": {
-              "const": "duckdb.xcframework/ios-arm64/duckdb.framework/duckdb"
-            },
-            "architecture": { "const": "arm64" },
-            "platform": { "const": "ios" },
-            "lcBuildVersionMinimum": { "const": "13.0" }
-          }
-        }
-      ]
-    },
-    "iosSimulatorArm64MachOSlice": {
-      "allOf": [
-        { "$ref": "#/$defs/machOSlice" },
-        {
-          "properties": {
-            "binaryPath": {
-              "const": "duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/duckdb"
-            },
-            "architecture": { "const": "arm64" },
-            "platform": { "const": "ios-simulator" },
-            "lcBuildVersionMinimum": { "const": "13.0" }
-          }
-        }
-      ]
-    },
-    "iosSimulatorX64MachOSlice": {
-      "allOf": [
-        { "$ref": "#/$defs/machOSlice" },
-        {
-          "properties": {
-            "binaryPath": {
-              "const": "duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/duckdb"
-            },
-            "architecture": { "const": "x86_64" },
-            "platform": { "const": "ios-simulator" },
-            "lcBuildVersionMinimum": { "const": "13.0" }
-          }
-        }
-      ]
-    },
-    "macosBinaryInspection": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["machOSlices"],
-      "properties": {
-        "machOSlices": {
-          "type": "array",
-          "prefixItems": [
-            {
-              "allOf": [
-                { "$ref": "#/$defs/machOSlice" },
-                {
-                  "properties": {
-                    "binaryPath": { "const": "libduckdb.dylib" },
-                    "architecture": { "const": "x86_64" },
-                    "platform": { "const": "macos" },
-                    "lcBuildVersionMinimum": { "const": "10.15" }
-                  }
-                }
-              ]
-            },
-            {
-              "allOf": [
-                { "$ref": "#/$defs/machOSlice" },
-                {
-                  "properties": {
-                    "binaryPath": { "const": "libduckdb.dylib" },
-                    "architecture": { "const": "arm64" },
-                    "platform": { "const": "macos" },
-                    "lcBuildVersionMinimum": { "const": "11.0" }
-                  }
-                }
-              ]
-            }
-          ],
-          "items": false,
-          "minItems": 2,
-          "maxItems": 2
-        }
-      }
-    },
-    "androidArtifact": {
-      "allOf": [
-        { "$ref": "#/$defs/artifactCommon" },
-        {
-          "type": "object",
-          "properties": {
-            "target": { "const": "android" },
-            "archive": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-android-arm64-v8a-x86_64.zip"
-                }
-              }
-            },
-            "architectures": {
-              "prefixItems": [
-                { "const": "arm64-v8a" },
-                { "const": "x86_64" }
               ],
               "items": false,
               "minItems": 2,
               "maxItems": 2
             },
             "members": {
-              "prefixItems": [
-                {
-                  "properties": {
-                    "path": { "const": "arm64-v8a/libduckdb.so" },
-                    "installPath": {
-                      "const": "android/src/main/jniLibs/arm64-v8a/libduckdb.so"
-                    },
-                    "executable": { "const": true }
-                  }
-                },
-                {
-                  "properties": {
-                    "path": { "const": "x86_64/libduckdb.so" },
-                    "installPath": {
-                      "const": "android/src/main/jniLibs/x86_64/libduckdb.so"
-                    },
-                    "executable": { "const": true }
-                  }
-                }
-              ],
-              "items": false,
-              "minItems": 2,
-              "maxItems": 2
-            },
-            "toolchains": { "$ref": "#/$defs/androidToolchains" },
-            "buildVariants": {
               "type": "array",
               "prefixItems": [
-                { "$ref": "#/$defs/androidArm64Variant" },
-                { "$ref": "#/$defs/androidX64Variant" }
+                { "$ref": "#/$defs/iosInfoMember" },
+                { "$ref": "#/$defs/iosDeviceMember" },
+                { "$ref": "#/$defs/iosSimulatorMember" }
               ],
-              "items": false,
-              "minItems": 2,
-              "maxItems": 2
-            },
-            "sbom": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-android-arm64-v8a-x86_64.zip.spdx.json"
-                },
-                "describes": {
-                  "properties": {
-                    "name": {
-                      "const": "duckdb-android-arm64-v8a-x86_64.zip"
-                    }
-                  }
-                }
-              }
-            },
-            "provenance": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-android-arm64-v8a-x86_64.zip.provenance.intoto.jsonl"
-                },
-                "subject": {
-                  "properties": {
-                    "name": {
-                      "const": "duckdb-android-arm64-v8a-x86_64.zip"
-                    }
-                  }
-                }
-              }
-            },
-            "sbomAttestation": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-android-arm64-v8a-x86_64.zip.sbom.intoto.jsonl"
-                },
-                "subject": {
-                  "properties": {
-                    "name": {
-                      "const": "duckdb-android-arm64-v8a-x86_64.zip"
-                    }
-                  }
-                },
-                "predicate": {
-                  "properties": {
-                    "fileName": {
-                      "const": "duckdb-android-arm64-v8a-x86_64.zip.spdx.json"
-                    }
-                  }
-                }
-              }
+              "items": { "$ref": "#/$defs/member" },
+              "minItems": 3,
+              "maxItems": 64,
+              "uniqueItems": true
             }
           }
         }
-      ],
-      "unevaluatedProperties": false
-    },
-    "iosArtifact": {
-      "allOf": [
-        { "$ref": "#/$defs/artifactCommon" },
-        {
-          "type": "object",
-          "required": ["packaging", "binaryInspection"],
-          "properties": {
-            "target": { "const": "ios" },
-            "archive": {
-              "properties": {
-                "fileName": { "const": "duckdb-ios-xcframework.zip" }
-              }
-            },
-            "architectures": {
-              "prefixItems": [
-                { "const": "device-arm64" },
-                { "const": "simulator-arm64" },
-                { "const": "simulator-x86_64" }
-              ],
-              "items": false,
-              "minItems": 3,
-              "maxItems": 3
-            },
-            "members": {
-              "prefixItems": [
-                { "$ref": "#/$defs/iosRootInfoMember" },
-                { "$ref": "#/$defs/iosDeviceBinaryMember" },
-                { "$ref": "#/$defs/iosDeviceInfoMember" },
-                { "$ref": "#/$defs/iosDeviceHeaderMember" },
-                { "$ref": "#/$defs/iosDeviceModuleMember" },
-                { "$ref": "#/$defs/iosSimulatorBinaryMember" },
-                { "$ref": "#/$defs/iosSimulatorInfoMember" },
-                { "$ref": "#/$defs/iosSimulatorHeaderMember" },
-                { "$ref": "#/$defs/iosSimulatorModuleMember" }
-              ],
-              "items": false,
-              "minItems": 9,
-              "maxItems": 9
-            },
-            "toolchains": { "$ref": "#/$defs/appleToolchains" },
-            "buildVariants": {
-              "type": "array",
-              "prefixItems": [
-                { "$ref": "#/$defs/iosDeviceVariant" },
-                { "$ref": "#/$defs/iosSimulatorArm64Variant" },
-                { "$ref": "#/$defs/iosSimulatorX64Variant" }
-              ],
-              "items": false,
-              "minItems": 3,
-              "maxItems": 3
-            },
-            "packaging": { "$ref": "#/$defs/iosPackaging" },
-            "binaryInspection": { "$ref": "#/$defs/iosBinaryInspection" },
-            "sbom": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-ios-xcframework.zip.spdx.json"
-                },
-                "describes": {
-                  "properties": {
-                    "name": { "const": "duckdb-ios-xcframework.zip" }
-                  }
-                }
-              }
-            },
-            "provenance": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-ios-xcframework.zip.provenance.intoto.jsonl"
-                },
-                "subject": {
-                  "properties": {
-                    "name": { "const": "duckdb-ios-xcframework.zip" }
-                  }
-                }
-              }
-            },
-            "sbomAttestation": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-ios-xcframework.zip.sbom.intoto.jsonl"
-                },
-                "subject": {
-                  "properties": {
-                    "name": { "const": "duckdb-ios-xcframework.zip" }
-                  }
-                },
-                "predicate": {
-                  "properties": {
-                    "fileName": {
-                      "const": "duckdb-ios-xcframework.zip.spdx.json"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      ],
-      "unevaluatedProperties": false
-    },
-    "iosRootInfoMember": {
-      "properties": {
-        "path": { "const": "duckdb.xcframework/Info.plist" },
-        "installPath": {
-          "const": "ios/Libraries/release/duckdb.xcframework/Info.plist"
-        },
-        "executable": { "const": false }
-      }
-    },
-    "iosDeviceBinaryMember": {
-      "properties": {
-        "path": {
-          "const": "duckdb.xcframework/ios-arm64/duckdb.framework/duckdb"
-        },
-        "installPath": {
-          "const": "ios/Libraries/release/duckdb.xcframework/ios-arm64/duckdb.framework/duckdb"
-        },
-        "executable": { "const": true }
-      }
-    },
-    "iosDeviceInfoMember": {
-      "properties": {
-        "path": {
-          "const": "duckdb.xcframework/ios-arm64/duckdb.framework/Info.plist"
-        },
-        "installPath": {
-          "const": "ios/Libraries/release/duckdb.xcframework/ios-arm64/duckdb.framework/Info.plist"
-        },
-        "executable": { "const": false }
-      }
-    },
-    "iosDeviceHeaderMember": {
-      "properties": {
-        "path": {
-          "const": "duckdb.xcframework/ios-arm64/duckdb.framework/Headers/duckdb.h"
-        },
-        "installPath": {
-          "const": "ios/Libraries/release/duckdb.xcframework/ios-arm64/duckdb.framework/Headers/duckdb.h"
-        },
-        "executable": { "const": false }
-      }
-    },
-    "iosDeviceModuleMember": {
-      "properties": {
-        "path": {
-          "const": "duckdb.xcframework/ios-arm64/duckdb.framework/Modules/module.modulemap"
-        },
-        "installPath": {
-          "const": "ios/Libraries/release/duckdb.xcframework/ios-arm64/duckdb.framework/Modules/module.modulemap"
-        },
-        "executable": { "const": false }
-      }
-    },
-    "iosSimulatorBinaryMember": {
-      "properties": {
-        "path": {
-          "const": "duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/duckdb"
-        },
-        "installPath": {
-          "const": "ios/Libraries/release/duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/duckdb"
-        },
-        "executable": { "const": true }
-      }
-    },
-    "iosSimulatorInfoMember": {
-      "properties": {
-        "path": {
-          "const": "duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Info.plist"
-        },
-        "installPath": {
-          "const": "ios/Libraries/release/duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Info.plist"
-        },
-        "executable": { "const": false }
-      }
-    },
-    "iosSimulatorHeaderMember": {
-      "properties": {
-        "path": {
-          "const": "duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Headers/duckdb.h"
-        },
-        "installPath": {
-          "const": "ios/Libraries/release/duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Headers/duckdb.h"
-        },
-        "executable": { "const": false }
-      }
-    },
-    "iosSimulatorModuleMember": {
-      "properties": {
-        "path": {
-          "const": "duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Modules/module.modulemap"
-        },
-        "installPath": {
-          "const": "ios/Libraries/release/duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Modules/module.modulemap"
-        },
-        "executable": { "const": false }
-      }
+      ]
     },
     "macosArtifact": {
       "allOf": [
-        { "$ref": "#/$defs/artifactCommon" },
+        { "$ref": "#/$defs/artifact" },
         {
-          "type": "object",
-          "required": ["packaging", "binaryInspection"],
           "properties": {
             "target": { "const": "macos" },
-            "archive": {
-              "properties": {
-                "fileName": { "const": "duckdb-macos-universal.zip" }
-              }
-            },
-            "architectures": {
+            "fileName": { "const": "duckdb-macos-universal.zip" },
+            "supportedPlatforms": {
+              "type": "array",
               "prefixItems": [
-                { "const": "x86_64" },
-                { "const": "arm64" }
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["platform", "architectures", "minimumOsVersion"],
+                  "properties": {
+                    "platform": { "const": "macos" },
+                    "architectures": {
+                      "type": "array",
+                      "prefixItems": [{ "const": "x86_64" }],
+                      "items": false,
+                      "minItems": 1,
+                      "maxItems": 1
+                    },
+                    "minimumOsVersion": { "const": "10.15" }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["platform", "architectures", "minimumOsVersion"],
+                  "properties": {
+                    "platform": { "const": "macos" },
+                    "architectures": {
+                      "type": "array",
+                      "prefixItems": [{ "const": "arm64" }],
+                      "items": false,
+                      "minItems": 1,
+                      "maxItems": 1
+                    },
+                    "minimumOsVersion": { "const": "11.0" }
+                  }
+                }
               ],
               "items": false,
               "minItems": 2,
               "maxItems": 2
             },
             "members": {
-              "prefixItems": [
-                {
-                  "properties": {
-                    "path": { "const": "libduckdb.dylib" },
-                    "installPath": {
-                      "const": "macos/Libraries/release/libduckdb.dylib"
-                    },
-                    "executable": { "const": true }
-                  }
-                }
-              ],
-              "items": false,
-              "minItems": 1,
-              "maxItems": 1
-            },
-            "toolchains": { "$ref": "#/$defs/appleToolchains" },
-            "buildVariants": {
               "type": "array",
-              "prefixItems": [
-                { "$ref": "#/$defs/macosX64Variant" },
-                { "$ref": "#/$defs/macosArm64Variant" }
-              ],
-              "items": false,
-              "minItems": 2,
-              "maxItems": 2
-            },
-            "packaging": { "$ref": "#/$defs/macosPackaging" },
-            "binaryInspection": {
-              "$ref": "#/$defs/macosBinaryInspection"
-            },
-            "sbom": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-macos-universal.zip.spdx.json"
-                },
-                "describes": {
-                  "properties": {
-                    "name": { "const": "duckdb-macos-universal.zip" }
-                  }
-                }
-              }
-            },
-            "provenance": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-macos-universal.zip.provenance.intoto.jsonl"
-                },
-                "subject": {
-                  "properties": {
-                    "name": { "const": "duckdb-macos-universal.zip" }
-                  }
-                }
-              }
-            },
-            "sbomAttestation": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-macos-universal.zip.sbom.intoto.jsonl"
-                },
-                "subject": {
-                  "properties": {
-                    "name": { "const": "duckdb-macos-universal.zip" }
-                  }
-                },
-                "predicate": {
-                  "properties": {
-                    "fileName": {
-                      "const": "duckdb-macos-universal.zip.spdx.json"
-                    }
-                  }
-                }
-              }
+              "prefixItems": [{ "$ref": "#/$defs/macosMember" }],
+              "items": { "$ref": "#/$defs/member" },
+              "minItems": 1,
+              "maxItems": 64,
+              "uniqueItems": true
             }
           }
         }
-      ],
-      "unevaluatedProperties": false
+      ]
     },
     "linuxArtifact": {
       "allOf": [
-        { "$ref": "#/$defs/artifactCommon" },
+        { "$ref": "#/$defs/artifact" },
         {
-          "type": "object",
           "properties": {
             "target": { "const": "linux" },
-            "archive": {
-              "properties": {
-                "fileName": { "const": "duckdb-linux-x86_64.zip" }
-              }
-            },
-            "architectures": {
-              "prefixItems": [{ "const": "x86_64" }],
+            "fileName": { "const": "duckdb-linux-x86_64.zip" },
+            "supportedPlatforms": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["platform", "architectures"],
+                  "properties": {
+                    "platform": { "const": "linux" },
+                    "architectures": {
+                      "type": "array",
+                      "prefixItems": [{ "const": "x86_64" }],
+                      "items": false,
+                      "minItems": 1,
+                      "maxItems": 1
+                    }
+                  }
+                }
+              ],
               "items": false,
               "minItems": 1,
               "maxItems": 1
             },
             "members": {
-              "prefixItems": [
-                {
-                  "properties": {
-                    "path": { "const": "libduckdb.so" },
-                    "installPath": {
-                      "const": "linux/Libraries/release/libduckdb.so"
-                    },
-                    "executable": { "const": true }
-                  }
-                }
-              ],
-              "items": false,
-              "minItems": 1,
-              "maxItems": 1
-            },
-            "toolchains": { "$ref": "#/$defs/linuxToolchains" },
-            "buildVariants": {
               "type": "array",
-              "prefixItems": [
-                { "$ref": "#/$defs/linuxX64Variant" }
-              ],
-              "items": false,
+              "prefixItems": [{ "$ref": "#/$defs/linuxMember" }],
+              "items": { "$ref": "#/$defs/member" },
               "minItems": 1,
-              "maxItems": 1
-            },
-            "sbom": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-linux-x86_64.zip.spdx.json"
-                },
-                "describes": {
-                  "properties": {
-                    "name": { "const": "duckdb-linux-x86_64.zip" }
-                  }
-                }
-              }
-            },
-            "provenance": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-linux-x86_64.zip.provenance.intoto.jsonl"
-                },
-                "subject": {
-                  "properties": {
-                    "name": { "const": "duckdb-linux-x86_64.zip" }
-                  }
-                }
-              }
-            },
-            "sbomAttestation": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-linux-x86_64.zip.sbom.intoto.jsonl"
-                },
-                "subject": {
-                  "properties": {
-                    "name": { "const": "duckdb-linux-x86_64.zip" }
-                  }
-                },
-                "predicate": {
-                  "properties": {
-                    "fileName": {
-                      "const": "duckdb-linux-x86_64.zip.spdx.json"
-                    }
-                  }
-                }
-              }
+              "maxItems": 64,
+              "uniqueItems": true
             }
           }
         }
-      ],
-      "unevaluatedProperties": false
+      ]
     },
     "windowsArtifact": {
       "allOf": [
-        { "$ref": "#/$defs/artifactCommon" },
+        { "$ref": "#/$defs/artifact" },
         {
-          "type": "object",
           "properties": {
             "target": { "const": "windows" },
-            "archive": {
-              "properties": {
-                "fileName": { "const": "duckdb-windows-x64.zip" }
-              }
-            },
-            "architectures": {
-              "prefixItems": [{ "const": "x64" }],
+            "fileName": { "const": "duckdb-windows-x64.zip" },
+            "supportedPlatforms": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["platform", "architectures"],
+                  "properties": {
+                    "platform": { "const": "windows" },
+                    "architectures": {
+                      "type": "array",
+                      "prefixItems": [{ "const": "x64" }],
+                      "items": false,
+                      "minItems": 1,
+                      "maxItems": 1
+                    }
+                  }
+                }
+              ],
               "items": false,
               "minItems": 1,
               "maxItems": 1
             },
             "members": {
-              "prefixItems": [
-                {
-                  "properties": {
-                    "path": { "const": "duckdb.dll" },
-                    "installPath": {
-                      "const": "windows/Libraries/release/duckdb.dll"
-                    },
-                    "executable": { "const": true }
-                  }
-                }
-              ],
-              "items": false,
-              "minItems": 1,
-              "maxItems": 1
-            },
-            "toolchains": { "$ref": "#/$defs/windowsToolchains" },
-            "buildVariants": {
               "type": "array",
-              "prefixItems": [
-                { "$ref": "#/$defs/windowsX64Variant" }
-              ],
-              "items": false,
+              "prefixItems": [{ "$ref": "#/$defs/windowsMember" }],
+              "items": { "$ref": "#/$defs/member" },
               "minItems": 1,
-              "maxItems": 1
-            },
-            "sbom": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-windows-x64.zip.spdx.json"
-                },
-                "describes": {
-                  "properties": {
-                    "name": { "const": "duckdb-windows-x64.zip" }
-                  }
-                }
-              }
-            },
-            "provenance": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-windows-x64.zip.provenance.intoto.jsonl"
-                },
-                "subject": {
-                  "properties": {
-                    "name": { "const": "duckdb-windows-x64.zip" }
-                  }
-                }
-              }
-            },
-            "sbomAttestation": {
-              "properties": {
-                "fileName": {
-                  "const": "duckdb-windows-x64.zip.sbom.intoto.jsonl"
-                },
-                "subject": {
-                  "properties": {
-                    "name": { "const": "duckdb-windows-x64.zip" }
-                  }
-                },
-                "predicate": {
-                  "properties": {
-                    "fileName": {
-                      "const": "duckdb-windows-x64.zip.spdx.json"
-                    }
-                  }
-                }
-              }
+              "maxItems": 64,
+              "uniqueItems": true
             }
           }
         }
-      ],
-      "unevaluatedProperties": false
+      ]
+    },
+    "androidArm64Member": {
+      "allOf": [
+        { "$ref": "#/$defs/member" },
+        { "properties": {
+          "path": { "const": "arm64-v8a/libduckdb.so" },
+          "installDestination": { "const": "android/src/main/jniLibs/arm64-v8a/libduckdb.so" }
+        } }
+      ]
+    },
+    "androidX64Member": {
+      "allOf": [
+        { "$ref": "#/$defs/member" },
+        { "properties": {
+          "path": { "const": "x86_64/libduckdb.so" },
+          "installDestination": { "const": "android/src/main/jniLibs/x86_64/libduckdb.so" }
+        } }
+      ]
+    },
+    "iosInfoMember": {
+      "allOf": [
+        { "$ref": "#/$defs/member" },
+        { "properties": {
+          "path": { "const": "duckdb.xcframework/Info.plist" },
+          "installDestination": { "const": "ios/Libraries/release/duckdb.xcframework/Info.plist" }
+        } }
+      ]
+    },
+    "iosDeviceMember": {
+      "allOf": [
+        { "$ref": "#/$defs/member" },
+        { "properties": {
+          "path": { "const": "duckdb.xcframework/ios-arm64/duckdb.framework/duckdb" },
+          "installDestination": { "const": "ios/Libraries/release/duckdb.xcframework/ios-arm64/duckdb.framework/duckdb" }
+        } }
+      ]
+    },
+    "iosSimulatorMember": {
+      "allOf": [
+        { "$ref": "#/$defs/member" },
+        { "properties": {
+          "path": { "const": "duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/duckdb" },
+          "installDestination": { "const": "ios/Libraries/release/duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/duckdb" }
+        } }
+      ]
+    },
+    "macosMember": {
+      "allOf": [
+        { "$ref": "#/$defs/member" },
+        { "properties": {
+          "path": { "const": "libduckdb.dylib" },
+          "installDestination": { "const": "macos/Libraries/release/libduckdb.dylib" }
+        } }
+      ]
+    },
+    "linuxMember": {
+      "allOf": [
+        { "$ref": "#/$defs/member" },
+        { "properties": {
+          "path": { "const": "libduckdb.so" },
+          "installDestination": { "const": "linux/Libraries/release/libduckdb.so" }
+        } }
+      ]
+    },
+    "windowsMember": {
+      "allOf": [
+        { "$ref": "#/$defs/member" },
+        { "properties": {
+          "path": { "const": "duckdb.dll" },
+          "installDestination": { "const": "windows/Libraries/release/duckdb.dll" }
+        } }
+      ]
     }
   }
 }
