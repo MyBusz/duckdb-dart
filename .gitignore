@@ -93,6 +93,11 @@ coverage/
 
 # End of https://www.toptal.com/developers/gitignore/api/flutter,dart
 
+# Generated native library materializations
+android/src/main/jniLibs/arm64-v8a/
+android/src/main/jniLibs/x86_64/
+*/Libraries/release/
+
 examples/simple/linux/flutter/ephemeral/.plugin_symlinks/
 
 # FVM Version Cache

@@ -23,3 +23,8 @@ package-lock.json
 
 # Ignore vendored native source and its build/release metadata
 vendor/
+
+# Ignore generated native library materializations
+android/src/main/jniLibs/arm64-v8a/
+android/src/main/jniLibs/x86_64/
+*/Libraries/release/
