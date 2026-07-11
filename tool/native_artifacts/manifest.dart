@@ -12,11 +12,16 @@ const maxManifestBytes = 1024 * 1024;
 const maxSchemaBytes = 1024 * 1024;
 
 const requiredBuildToolNames = <String>[
-  'cmake',
-  'ninja',
+  'android-cmake',
+  'android-ninja',
+  'linux-cmake',
+  'linux-ninja',
   'linux-clang',
+  'apple-cmake',
+  'apple-ninja',
   'xcode',
   'apple-clang',
+  'windows-cmake',
   'visual-studio',
   'msvc',
 ];

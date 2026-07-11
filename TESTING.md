@@ -24,6 +24,14 @@ Pure tests do not require downloaded native artifacts, bootstrap, or
 "$DART" test --help
 ```
 
+The candidate generator has stdlib-only Python tests. Its happy path is also
+covered by a Dart test that passes generated output through `seed-local`:
+
+```sh
+python3 -m unittest test/native_artifacts/generate_candidate_test.py
+"$DART" test test/native_artifacts
+```
+
 ## Full native tests
 
 The full native suite requires the explicit native-artifact bootstrap to finish

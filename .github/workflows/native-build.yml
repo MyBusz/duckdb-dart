@@ -1,0 +1,316 @@
+name: Native release candidate
+
+on:
+  push:
+    branches:
+      - mybusz/1.4.4-duckdb-1.4.2
+    paths-ignore:
+      - native/assets.lock.json
+      - native/SHA256SUMS
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-candidate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    name: Android arm64-v8a and x86_64
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - name: Check out source commit recursively
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          clean: true
+          persist-credentials: false
+
+      - name: Provision exact Android native toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v sdkmanager
+          sdkmanager --install "ndk;28.2.13676358" "cmake;3.22.1"
+          test -x "$ANDROID_SDK_ROOT/cmake/3.22.1/bin/cmake"
+          test -x "$ANDROID_SDK_ROOT/cmake/3.22.1/bin/ninja"
+          test -f "$ANDROID_SDK_ROOT/ndk/28.2.13676358/source.properties"
+
+      - name: Build and validate Android archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          export CMAKE="$ANDROID_SDK_ROOT/cmake/3.22.1/bin/cmake"
+          export NINJA="$ANDROID_SDK_ROOT/cmake/3.22.1/bin/ninja"
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/28.2.13676358"
+          output="$RUNNER_TEMP/android-output"
+          android/build_android.sh \
+            --source-commit "$GITHUB_SHA" \
+            --output-dir "$output"
+          cmake_output="$($CMAKE --version)"
+          cmake_line="${cmake_output%%$'\n'*}"
+          cmake_version="${cmake_line#cmake version }"
+          ninja_version="$($NINJA --version)"
+          python3 tool/native_artifacts/generate_candidate.py record-tools \
+            --platform android \
+            --source-commit "$GITHUB_SHA" \
+            --output "$output/android-tools.json" \
+            --tool "android-cmake=$cmake_version" \
+            --tool "android-ninja=$ninja_version"
+
+      - name: Upload Android native result
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-android-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/android-output/duckdb-android-arm64-v8a-x86_64.zip
+            ${{ runner.temp }}/android-output/android-tools.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  linux:
+    name: Linux x86_64 Clang 14 baseline
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - name: Check out source commit recursively
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          clean: true
+          persist-credentials: false
+
+      - name: Build, inspect, and smoke Linux archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/linux-output"
+          linux/build_duckdb.sh "$GITHUB_SHA" "$output"
+          cmake_output="$(cmake --version)"
+          cmake_line="${cmake_output%%$'\n'*}"
+          cmake_version="${cmake_line#cmake version }"
+          ninja_version="$(ninja --version)"
+          clang_version="$(clang-14 -dumpfullversion -dumpversion)"
+          python3 tool/native_artifacts/generate_candidate.py record-tools \
+            --platform linux \
+            --source-commit "$GITHUB_SHA" \
+            --output "$output/linux-tools.json" \
+            --tool "linux-cmake=$cmake_version" \
+            --tool "linux-ninja=$ninja_version" \
+            --tool "linux-clang=$clang_version"
+
+      - name: Upload Linux native result
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-linux-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/linux-output/duckdb-linux-x86_64.zip
+            ${{ runner.temp }}/linux-output/linux-tools.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  apple:
+    name: iOS and macOS universal packages
+    runs-on: macos-15-intel
+    timeout-minutes: 300
+    steps:
+      - name: Check out source commit recursively
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          clean: true
+          persist-credentials: false
+
+      - name: Build and validate iOS and macOS archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          ios_output="$RUNNER_TEMP/ios-output"
+          macos_output="$RUNNER_TEMP/macos-output"
+          metadata_output="$RUNNER_TEMP/apple-output"
+          ios/build_duckdb.sh "$GITHUB_SHA" "$ios_output"
+          macos/build_duckdb.sh "$GITHUB_SHA" "$macos_output"
+          cmake_output="$(cmake --version)"
+          cmake_line="${cmake_output%%$'\n'*}"
+          cmake_version="${cmake_line#cmake version }"
+          ninja_version="$(ninja --version)"
+          xcode_output="$(xcodebuild -version)"
+          xcode_line="${xcode_output%%$'\n'*}"
+          xcode_version="${xcode_line#Xcode }"
+          clang_output="$(xcrun clang --version)"
+          clang_line="${clang_output%%$'\n'*}"
+          clang_version="${clang_line#Apple clang version }"
+          clang_version="${clang_version%% *}"
+          mkdir -p "$metadata_output"
+          cp "$ios_output/duckdb-ios-xcframework.zip" "$metadata_output/"
+          cp "$macos_output/duckdb-macos-universal.zip" "$metadata_output/"
+          python3 tool/native_artifacts/generate_candidate.py record-tools \
+            --platform apple \
+            --source-commit "$GITHUB_SHA" \
+            --output "$metadata_output/apple-tools.json" \
+            --tool "apple-cmake=$cmake_version" \
+            --tool "apple-ninja=$ninja_version" \
+            --tool "xcode=$xcode_version" \
+            --tool "apple-clang=$clang_version"
+
+      - name: Upload Apple native results
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-apple-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/apple-output/duckdb-ios-xcframework.zip
+            ${{ runner.temp }}/apple-output/duckdb-macos-universal.zip
+            ${{ runner.temp }}/apple-output/apple-tools.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  windows:
+    name: Windows x64 MSVC package
+    runs-on: windows-2022
+    timeout-minutes: 240
+    steps:
+      - name: Check out source commit recursively
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          clean: true
+          persist-credentials: false
+
+      - name: Build, DUMPBIN inspect, and smoke Windows archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $Output = Join-Path $env:RUNNER_TEMP "windows-output"
+          & ./windows/BuildDuckDB.ps1 `
+            -OutputDirectory $Output `
+            -ExpectedWrapperCommit $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Windows native build failed" }
+
+          $CmakeLine = (& cmake --version | Select-Object -First 1).Trim()
+          if ($CmakeLine -notmatch '^cmake version (.+)$') { throw "Cannot parse CMake version" }
+          $CmakeVersion = $Matches[1]
+          $VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $VisualStudioVersion = (& $VsWhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationVersion | Out-String).Trim()
+          $CompilerFile = Get-ChildItem -Path "windows/.build/release/CMakeFiles" `
+            -Filter "CMakeCXXCompiler.cmake" -Recurse | Select-Object -First 1
+          $CompilerIdentity = Get-Content -LiteralPath $CompilerFile.FullName -Raw
+          if ($CompilerIdentity -notmatch 'CMAKE_CXX_COMPILER_VERSION "([^"]+)"') {
+            throw "Cannot parse MSVC version"
+          }
+          $MsvcVersion = $Matches[1]
+          & python tool/native_artifacts/generate_candidate.py record-tools `
+            --platform windows `
+            --source-commit $env:GITHUB_SHA `
+            --output (Join-Path $Output "windows-tools.json") `
+            --tool "windows-cmake=$CmakeVersion" `
+            --tool "visual-studio=$VisualStudioVersion" `
+            --tool "msvc=$MsvcVersion"
+          if ($LASTEXITCODE -ne 0) { throw "Windows tool metadata failed" }
+
+      - name: Upload Windows native result
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-windows-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/windows-output/duckdb-windows-x64.zip
+            ${{ runner.temp }}/windows-output/windows-tools.json
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  aggregate:
+    name: Generate and bootstrap candidate
+    needs:
+      - android
+      - linux
+      - apple
+      - windows
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out source commit recursively
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          submodules: recursive
+          clean: true
+          persist-credentials: false
+
+      - name: Download Android result
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-android-${{ github.sha }}
+          path: ${{ runner.temp }}/candidate-input
+
+      - name: Download Linux result
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-linux-${{ github.sha }}
+          path: ${{ runner.temp }}/candidate-input
+
+      - name: Download Apple result
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-apple-${{ github.sha }}
+          path: ${{ runner.temp }}/candidate-input
+
+      - name: Download Windows result
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-windows-${{ github.sha }}
+          path: ${{ runner.temp }}/candidate-input
+
+      - name: Generate deterministic seven-asset candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tool/native_artifacts/generate_candidate.py generate \
+            --input-dir "$RUNNER_TEMP/candidate-input" \
+            --source-commit "$GITHUB_SHA" \
+            --output-dir "$RUNNER_TEMP/native-candidate-$GITHUB_SHA"
+
+      - name: Set up pinned Flutter and Dart
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.41.3
+          cache: false
+
+      - name: Validate candidate with authoritative bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter_version="$(flutter --version)"
+          grep -F 'Flutter 3.41.3' <<<"$flutter_version"
+          dart_version="$(dart --version 2>&1)"
+          grep -F 'Dart SDK version: 3.11.1' <<<"$dart_version"
+          flutter pub get
+          dart run tool/native_artifacts.dart seed-local \
+            --release-dir "$RUNNER_TEMP/native-candidate-$GITHUB_SHA" \
+            --cache-root "$RUNNER_TEMP/native-candidate-cache"
+
+      - name: Upload complete native candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/native-candidate-${{ github.sha }}/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0

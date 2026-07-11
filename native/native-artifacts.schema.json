@@ -32,17 +32,22 @@
         "buildTools": {
           "type": "array",
           "prefixItems": [
-            { "$ref": "#/$defs/cmakeTool" },
-            { "$ref": "#/$defs/ninjaTool" },
+            { "$ref": "#/$defs/androidCmakeTool" },
+            { "$ref": "#/$defs/androidNinjaTool" },
+            { "$ref": "#/$defs/linuxCmakeTool" },
+            { "$ref": "#/$defs/linuxNinjaTool" },
             { "$ref": "#/$defs/linuxClangTool" },
+            { "$ref": "#/$defs/appleCmakeTool" },
+            { "$ref": "#/$defs/appleNinjaTool" },
             { "$ref": "#/$defs/xcodeTool" },
             { "$ref": "#/$defs/appleClangTool" },
+            { "$ref": "#/$defs/windowsCmakeTool" },
             { "$ref": "#/$defs/visualStudioTool" },
             { "$ref": "#/$defs/msvcTool" }
           ],
           "items": false,
-          "minItems": 7,
-          "maxItems": 7
+          "minItems": 12,
+          "maxItems": 12
         }
       }
     },
@@ -119,16 +124,28 @@
         "version": { "$ref": "#/$defs/toolVersion" }
       }
     },
-    "cmakeTool": {
+    "androidCmakeTool": {
       "allOf": [
         { "$ref": "#/$defs/buildTool" },
-        { "properties": { "name": { "const": "cmake" } } }
+        { "properties": { "name": { "const": "android-cmake" } } }
       ]
     },
-    "ninjaTool": {
+    "androidNinjaTool": {
       "allOf": [
         { "$ref": "#/$defs/buildTool" },
-        { "properties": { "name": { "const": "ninja" } } }
+        { "properties": { "name": { "const": "android-ninja" } } }
+      ]
+    },
+    "linuxCmakeTool": {
+      "allOf": [
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "linux-cmake" } } }
+      ]
+    },
+    "linuxNinjaTool": {
+      "allOf": [
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "linux-ninja" } } }
       ]
     },
     "linuxClangTool": {
@@ -147,6 +164,24 @@
       "allOf": [
         { "$ref": "#/$defs/buildTool" },
         { "properties": { "name": { "const": "apple-clang" } } }
+      ]
+    },
+    "appleCmakeTool": {
+      "allOf": [
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "apple-cmake" } } }
+      ]
+    },
+    "appleNinjaTool": {
+      "allOf": [
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "apple-ninja" } } }
+      ]
+    },
+    "windowsCmakeTool": {
+      "allOf": [
+        { "$ref": "#/$defs/buildTool" },
+        { "properties": { "name": { "const": "windows-cmake" } } }
       ]
     },
     "visualStudioTool": {

@@ -98,6 +98,14 @@ android/src/main/jniLibs/arm64-v8a/
 android/src/main/jniLibs/x86_64/
 */Libraries/release/
 
+# Hosted native candidate scratch/output
+.native-candidate-input/
+.native-candidate-output/
+
+# Python generator bytecode
+__pycache__/
+*.py[cod]
+
 examples/simple/linux/flutter/ephemeral/.plugin_symlinks/
 
 # FVM Version Cache

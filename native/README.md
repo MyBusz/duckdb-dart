@@ -16,10 +16,12 @@ selected bytes, and installs exact members without downloading during a build.
 - Android NDK: `28.2.13676358`
 - Static extensions: `icu`, `parquet`, `json`
 
-The ordered native build-tool identity set is `cmake`, `ninja`,
-`linux-clang`, `xcode`, `apple-clang`, `visual-studio`, and `msvc`. The hosted
-Linux build uses Clang; its selected version, like the other final tool
-versions, remains release data recorded in `assets.lock.json`.
+The ordered native build-tool identity set is platform-qualified so different
+runner tools are never collapsed into one ambiguous version: `android-cmake`,
+`android-ninja`, `linux-cmake`, `linux-ninja`, `linux-clang`, `apple-cmake`,
+`apple-ninja`, `xcode`, `apple-clang`, `windows-cmake`, `visual-studio`, and
+`msvc`. Their exact hosted-runner versions are release data recorded in
+`assets.lock.json`.
 
 The `sourceCommit` in `assets.lock.json` is the reviewed wrapper source commit
 `S` used to build every ZIP. It is based on the wrapper baseline above. Final
@@ -75,6 +77,28 @@ Archive member paths and install destinations are normalized relative POSIX
 paths. Absolute paths, drive paths, backslashes, empty segments, `.` and `..`
 segments, duplicate paths, and destinations that do not equal the fixed install
 root plus the member path are rejected.
+
+## Candidate generation
+
+Each hosted native job emits its ZIPs plus one strict metadata file named
+`android-tools.json`, `linux-tools.json`, `apple-tools.json`, or
+`windows-tools.json`. Metadata records the platform, source and DuckDB commits,
+and that platform's exact tool identities in the order above. The generator
+rejects missing, extra, duplicate, malformed, unknown, or source-mismatched
+inputs and derives all archive/member sizes and SHA-256 values from bytes:
+
+```sh
+python3 tool/native_artifacts/generate_candidate.py generate \
+  --input-dir /path/to/five-zips-and-four-tool-files \
+  --source-commit 0123456789abcdef0123456789abcdef01234567 \
+  --output-dir /path/to/new-seven-asset-candidate
+```
+
+`record-tools` is the workflow-facing companion. It requires the exact tools
+for one platform as ordered `--tool NAME=VERSION` arguments. Candidate output is
+created in a new directory and contains unchanged ZIP bytes plus deterministic
+`assets.lock.json` and six-line `SHA256SUMS` files. The workflow then runs the
+authoritative Dart `seed-local` bootstrap over those seven files.
 
 Before Archive 4.0.9 sees any entry, the bootstrap performs a small ZIP-feature
 preflight. It bounds and exactly parses the EOCD and central directory, rejects

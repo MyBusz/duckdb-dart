@@ -49,9 +49,9 @@ void main() {
     ]);
     final toolchains = manifest.json['toolchains']! as Map<String, Object?>;
     final tools = toolchains['buildTools']! as List<Object?>;
-    expect(tools[2], <String, Object?>{
+    expect(tools[4], <String, Object?>{
       'name': 'linux-clang',
-      'version': '18.1.3',
+      'version': '14.0.0',
     });
   });
 
@@ -59,13 +59,13 @@ void main() {
     final json = syntheticManifest();
     final toolchains = json['toolchains']! as Map<String, Object?>;
     final tools = toolchains['buildTools']! as List<Object?>;
-    (tools[2]! as Map<String, Object?>)['version'] = '19.1.7';
+    (tools[4]! as Map<String, Object?>)['version'] = '19.1.7';
     final file = File('${scratch.path}/linux-clang-version.json')
       ..writeAsStringSync(jsonEncode(json));
     final manifest = await NativeManifest.load(file, schemaFile: schema);
     expect(
       ((manifest.json['toolchains']! as Map<String, Object?>)['buildTools']!
-          as List<Object?>)[2],
+          as List<Object?>)[4],
       <String, Object?>{'name': 'linux-clang', 'version': '19.1.7'},
     );
   });
@@ -88,7 +88,7 @@ void main() {
     'wrong build tool identity': (json) {
       final toolchains = json['toolchains']! as Map<String, Object?>;
       final tools = toolchains['buildTools']! as List<Object?>;
-      (tools[2]! as Map<String, Object?>)['name'] = 'arbitrary-compiler';
+      (tools[4]! as Map<String, Object?>)['name'] = 'arbitrary-compiler';
     },
     'wrong release': (json) => json['releaseTag'] = 'other',
     'wrong source type': (json) => json['sourceCommit'] = 1,
