@@ -1,1 +1,6 @@
-duckdb/
+/build/
+/dist/
+/duckdb/
+/src/main/jniLibs/
+__pycache__/
+*.zip

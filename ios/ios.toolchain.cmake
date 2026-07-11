@@ -1,36 +1,18 @@
-# ios.toolchain.cmake
-
+# Optional toolchain for manual CMake invocation. build_duckdb.sh passes the
+# same values directly so every device/simulator architecture has a clean cache.
 set(CMAKE_SYSTEM_NAME iOS)
 
-# Set the default iOS platform (adjust to your needs)
-set(IOS_PLATFORM $ENV{IOS_PLATFORM} CACHE STRING "iOS platform: iPhoneOS or iPhoneSimulator")
-set(DUCKDB_PLATFORM $ENV{DUCKDB_PLATFORM})
-set(SUPPORTED_PLATFORMS "MacOS")
-set(VCPKG_TOOLCHAIN_PATH $ENV{VCPKG_TOOLCHAIN_PATH})
+set(IOS_SDK "" CACHE STRING "iphoneos or iphonesimulator")
+set(IOS_ARCHITECTURES "" CACHE STRING "One or more iOS architectures")
 
-# Determine the correct SDK and architecture based on the platform
-if(IOS_PLATFORM STREQUAL "iPhoneSimulator")
-    set(CMAKE_OSX_SYSROOT "iphonesimulator")
-elseif(IOS_PLATFORM STREQUAL "iPhoneOS")
-    set(CMAKE_OSX_SYSROOT "iphoneos")
-else()
-    message(FATAL_ERROR "Invalid iOS platform: ${IOS_PLATFORM}")
+if(NOT IOS_SDK STREQUAL "iphoneos" AND
+   NOT IOS_SDK STREQUAL "iphonesimulator")
+    message(FATAL_ERROR "IOS_SDK must be iphoneos or iphonesimulator")
+endif()
+if(IOS_ARCHITECTURES STREQUAL "")
+    message(FATAL_ERROR "IOS_ARCHITECTURES must be set")
 endif()
 
-if(DUCKDB_PLATFORM STREQUAL "osx_amd64")
-    set(CMAKE_OSX_ARCHITECTURES "x86_64" CACHE STRING "Build architectures for iOS" FORCE)
-elseif(DUCKDB_PLATFORM STREQUAL "osx_arm64")
-    set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "Build architectures for iOS" FORCE)
-else()
-    message(FATAL_ERROR "Invalid duckdb platform: ${DUCKDB_PLATFORM}")
-endif()
-
-# Specify the minimum deployment target
-set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0")
-
-# Set the C++ standard
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Force Xcode to use the correct SDK
-set(CMAKE_XCODE_EFFECTIVE_PLATFORMS "-iphoneos;-iphonesimulator")
+set(CMAKE_OSX_SYSROOT "${IOS_SDK}" CACHE STRING "iOS SDK" FORCE)
+set(CMAKE_OSX_ARCHITECTURES "${IOS_ARCHITECTURES}" CACHE STRING "iOS architectures" FORCE)
+set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum iOS version" FORCE)

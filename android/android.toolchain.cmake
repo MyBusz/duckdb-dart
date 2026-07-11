@@ -1,30 +1,14 @@
-# android.toolchain.cmake
+# Compatibility wrapper for direct CMake callers. build_android.sh validates the
+# exact NDK revision and invokes the NDK toolchain file directly.
+if(NOT DEFINED ENV{ANDROID_NDK_HOME})
+  message(FATAL_ERROR "ANDROID_NDK_HOME must point to Android NDK 28.2.13676358")
+endif()
 
-# Set Android specific variables
-set(CMAKE_SYSTEM_NAME Android)
-set(CMAKE_SYSTEM_VERSION 23)  # Minimum supported API level
-set(CMAKE_ANDROID_STL_TYPE c++_static)
-set(CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION clang)
-set(CMAKE_ANDROID_ARCH_ABI ${ANDROID_ABI})
+set(ANDROID_PLATFORM android-21 CACHE STRING "Android minimum API" FORCE)
+set(ANDROID_STL c++_static CACHE STRING "Android C++ runtime" FORCE)
+set(ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES ON CACHE BOOL "16 KiB pages" FORCE)
+set(CMAKE_SHARED_LINKER_FLAGS
+    "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384"
+    CACHE STRING "Shared-library linker flags" FORCE)
 
-# Enable flexible page sizes for Android API 35+
-set(ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES ON)
-
-# Include the Android NDK toolchain
 include("$ENV{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake")
-
-# Include vcpkg toolchain after Android toolchain
-include("$ENV{VCPKG_TOOLCHAIN_PATH}")
-
-# Additional settings for cross-compilation
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
-
-# Force static linking for Android
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries" FORCE)
-
-# Set linker options for all targets
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-z,max-page-size=16384")
-set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-z,max-page-size=16384")

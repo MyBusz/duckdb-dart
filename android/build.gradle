@@ -1,4 +1,7 @@
-import org.apache.tools.ant.taskdefs.condition.Os
+import groovy.json.JsonSlurper
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.security.MessageDigest
 
 group 'com.tigereye.duckdb_libs'
 version '2.1.0'
@@ -41,58 +44,156 @@ android {
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
+        main.jniLibs.srcDirs = ['src/main/jniLibs']
     }
 
     defaultConfig {
         minSdkVersion 21 //current flutter min sdk version
 
         ndk {
-            abiFilters 'arm64-v8a', 'armeabi-v7a'
+            abiFilters 'arm64-v8a', 'x86_64'
         }
     }
 }
 
-def jniLibsDir = "$projectDir/src/main/jniLibs"
-
-def zipFiles = [
-    'arm64-v8a': 'https://github.com/TigerEyeLabs/duckdb-dart/releases/download/v1.4.4/libduckdb-android_arm64-v8a.zip',
-    'armeabi-v7a': 'https://github.com/TigerEyeLabs/duckdb-dart/releases/download/v1.4.4/libduckdb-android_armeabi-v7a.zip'
+def nativeAssetsLock = new File(projectDir.parentFile, 'native/assets.lock.json')
+def expectedAndroidMembers = [
+    'arm64-v8a/libduckdb.so': 'android/src/main/jniLibs/arm64-v8a/libduckdb.so',
+    'x86_64/libduckdb.so': 'android/src/main/jniLibs/x86_64/libduckdb.so',
 ]
+def requiredDuckDBLibraries = expectedAndroidMembers.values().collect { destination ->
+    new File(projectDir.parentFile, destination)
+}
 
-task downloadAndExtractDuckDB {
+def sha256 = { File input ->
+    def digest = MessageDigest.getInstance('SHA-256')
+    input.withInputStream { stream ->
+        byte[] buffer = new byte[1024 * 1024]
+        int count
+        while ((count = stream.read(buffer)) != -1) {
+            digest.update(buffer, 0, count)
+        }
+    }
+    digest.digest().collect { value -> String.format('%02x', value & 0xff) }.join()
+}
+
+tasks.register('verifyDuckDBJniLibs') {
+    group = 'verification'
+    description = 'Checks that the verified Android DuckDB libraries were bootstrapped locally.'
+    inputs.files(requiredDuckDBLibraries)
+
     doLast {
-        zipFiles.each { abi, url ->
-            def libDir = file("$jniLibsDir/$abi")
-            def libFile = file("$libDir/libduckdb.so")
-            if (!libFile.exists()) {
-                def tmpDir = file("$buildDir/tmp")
-                tmpDir.mkdirs()
-                def zipFile = file("$tmpDir/duckdb-${abi}.zip")
+        if (!Files.isRegularFile(nativeAssetsLock.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+            throw new GradleException(
+                "Missing native artifact lock metadata: ${nativeAssetsLock}. " +
+                'Install the verified release metadata before invoking Gradle; Gradle never downloads native files.'
+            )
+        }
 
-                // Ensure the jniLibs directory for this ABI exists
-                libDir.mkdirs()
+        def lock
+        try {
+            lock = new JsonSlurper().parse(nativeAssetsLock)
+        } catch (Exception error) {
+            throw new GradleException("Malformed native artifact lock metadata: ${nativeAssetsLock}", error)
+        }
+        if (!(lock instanceof Map) ||
+                lock.schemaVersion != 1 ||
+                lock.releaseTag != 'native-duckdb-1.4.2-r1' ||
+                !(lock.sourceCommit instanceof String) ||
+                !(lock.sourceCommit ==~ /[0-9a-f]{40}/) ||
+                lock.coreCommit != '68d7555f68bd25c1a251ccca2e6338949c33986a' ||
+                lock.staticExtensions != ['icu', 'parquet', 'json'] ||
+                !(lock.artifacts instanceof List) ||
+                !lock.artifacts.every { it instanceof Map && it.target instanceof String }) {
+            throw new GradleException('Malformed native artifact lock metadata or release identity.')
+        }
 
-                // Download the zip file
-                println "Downloading $url"
-                new URL(url).withInputStream { i ->
-                    zipFile.withOutputStream { it << i }
-                }
+        def androidArtifacts = lock.artifacts.findAll { artifact ->
+            artifact instanceof Map && artifact.target == 'android'
+        }
+        if (androidArtifacts.size() != 1) {
+            throw new GradleException('Native artifact lock metadata must contain exactly one Android artifact.')
+        }
+        def artifact = androidArtifacts.single()
+        if (artifact.fileName != 'duckdb-android-arm64-v8a-x86_64.zip' ||
+                !(artifact.size instanceof Integer || artifact.size instanceof Long ||
+                    artifact.size instanceof BigInteger) ||
+                artifact.size <= 0 ||
+                !(artifact.sha256 instanceof String) ||
+                !(artifact.sha256 ==~ /[0-9a-f]{64}/) ||
+                artifact.supportedPlatforms != [[
+                    platform: 'android',
+                    architectures: ['arm64-v8a', 'x86_64'],
+                    minimumOsVersion: '21',
+                ]] ||
+                !(artifact.members instanceof List) ||
+                artifact.members.size() != expectedAndroidMembers.size()) {
+            throw new GradleException('Android lock metadata has an unexpected artifact identity or member set.')
+        }
 
-                // Extract the zip file
-                println "Extracting to $libDir"
-                copy {
-                    from zipTree(zipFile)
-                    into libDir
-                    include "*.so"
-                }
-
-                // Clean up the zip file
-                delete zipFile
-            } else {
-                println "Library for $abi already exists, skipping download"
+        def lockedMembers = [:]
+        artifact.members.each { member ->
+            if (!(member instanceof Map) ||
+                    !(member.path instanceof String) ||
+                    !(member.installDestination instanceof String) ||
+                    !(member.size instanceof Integer || member.size instanceof Long ||
+                        member.size instanceof BigInteger) ||
+                    !(member.sha256 instanceof String) ||
+                    !(member.sha256 ==~ /[0-9a-f]{64}/)) {
+                throw new GradleException('Android lock metadata contains a malformed member record.')
+            }
+            if (lockedMembers.put(member.path, member) != null) {
+                throw new GradleException("Android lock metadata contains duplicate member ${member.path}.")
             }
         }
+
+        expectedAndroidMembers.each { memberPath, destination ->
+            def member = lockedMembers[memberPath]
+            if (member == null || member.installDestination != destination) {
+                throw new GradleException(
+                    "Android lock metadata must map ${memberPath} to ${destination}."
+                )
+            }
+            def library = new File(projectDir.parentFile, destination)
+            if (!Files.isRegularFile(library.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                throw new GradleException(
+                    "Missing prebootstrapped DuckDB Android library: ${destination}. " +
+                    'Run the repository native-artifact bootstrap before invoking Gradle; Gradle never downloads native files.'
+                )
+            }
+            long expectedSize
+            try {
+                expectedSize = new BigInteger(member.size.toString()).longValueExact()
+            } catch (ArithmeticException error) {
+                throw new GradleException("Android lock metadata has an invalid size for ${memberPath}.", error)
+            }
+            if (expectedSize <= 0 || library.length() != expectedSize) {
+                throw new GradleException(
+                    "DuckDB Android library size mismatch for ${destination}: " +
+                    "expected ${expectedSize}, found ${library.length()}."
+                )
+            }
+            def actualSha256 = sha256(library)
+            if (actualSha256 != member.sha256) {
+                throw new GradleException(
+                    "DuckDB Android library SHA-256 mismatch for ${destination}: " +
+                    "expected ${member.sha256}, found ${actualSha256}."
+                )
+            }
+        }
+
+        def jniRoot = file('src/main/jniLibs')
+        def actualLibraries = fileTree(jniRoot).matching { include '**/*.so' }.files.collect { library ->
+            "android/src/main/jniLibs/${jniRoot.toPath().relativize(library.toPath()).toString().replace(File.separatorChar, '/' as char)}"
+        } as Set
+        if (actualLibraries != expectedAndroidMembers.values() as Set) {
+            throw new GradleException(
+                "Installed Android native libraries do not match the lock contract: ${actualLibraries.sort()}."
+            )
+        }
     }
 }
 
-preBuild.dependsOn downloadAndExtractDuckDB
+tasks.named('preBuild').configure {
+    dependsOn tasks.named('verifyDuckDBJniLibs')
+}

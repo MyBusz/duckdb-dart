@@ -1,31 +1,18 @@
-VERSION = v1.4.2
-DUCKDB_REPO = https://github.com/duckdb/duckdb
-DUCKDB_DIR = ./duckdb
+.PHONY: all release clean help
 
-# common environment variables
-export BUILD_SHELL=0
+LINUX_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
-.PHONY: all reset clean release help
+all: release
 
-all: reset release ## Full Build
+release:
+	@test -n "$(OUTPUT_DIR)" || \
+		(echo "OUTPUT_DIR is required" >&2; exit 2)
+	@test -n "$(EXPECTED_WRAPPER_COMMIT)" || \
+		(echo "EXPECTED_WRAPPER_COMMIT is required" >&2; exit 2)
+	bash "$(LINUX_DIR)/build_duckdb.sh" "$(EXPECTED_WRAPPER_COMMIT)" "$(OUTPUT_DIR)"
 
-reset: ## Reset build environment
-	rm -rf ./Libraries/*
-	mkdir -p ./Libraries/release
-	rm -rf $(DUCKDB_DIR)
-
-## Clean duckdb build
 clean:
-	make -C $(DUCKDB_DIR) clean;
+	rm -rf "$(LINUX_DIR)/.build"
 
-duckdb: ## Clone DuckDb repo and apply patch
-	git clone --depth 1 --branch "$(VERSION)" $(DUCKDB_REPO) $(DUCKDB_DIR)
-
-release: duckdb ## x64 linux build
-	@export DUCKDB_PLATFORM=linux_amd64; \
-	export DUCKDB_EXTENSIONS='icu;parquet;json;fts;autocomplete'; \
-	make -C $(DUCKDB_DIR) GEN=ninja release; \
-	mv $(DUCKDB_DIR)/build/release/src/libduckdb.so ./Libraries/release/libduckdb.so;
-
-help: ## Display this help message
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+help:
+	@echo "make release EXPECTED_WRAPPER_COMMIT=<S> OUTPUT_DIR=/absolute/or/relative/output"

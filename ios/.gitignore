@@ -1,2 +1,5 @@
 duckdb/
 .ccache/
+Libraries/
+duckdb-ios-xcframework.zip
+__pycache__/

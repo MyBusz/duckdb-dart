@@ -1,1 +1,3 @@
+.build/
 duckdb/
+__pycache__/

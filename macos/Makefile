@@ -1,45 +1,22 @@
-VERSION = v1.4.2
-DUCKDB_REPO = https://github.com/duckdb/duckdb
-DUCKDB_DIR = ./duckdb
+OUTPUT_DIR ?=
+EXPECTED_WRAPPER_COMMIT ?=
 
-# common environment variables
-export BUILD_SHELL=0
-export OSX_BUILD_UNIVERSAL=1
+.PHONY: all package release check-local help
 
-.PHONY: all reset clean release help
+all: package
 
-all: reset release ## Full Build
+package release:
+	@test -n "$(OUTPUT_DIR)" || { echo "OUTPUT_DIR is required" >&2; exit 2; }
+	@test -n "$(EXPECTED_WRAPPER_COMMIT)" || { echo "EXPECTED_WRAPPER_COMMIT (source S) is required" >&2; exit 2; }
+	bash ./build_duckdb.sh "$(EXPECTED_WRAPPER_COMMIT)" "$(OUTPUT_DIR)"
 
-reset: ## Reset build environment
-	rm -rf ./Libraries/*
-	mkdir -p ./Libraries/release
-	rm -rf $(DUCKDB_DIR)
+check-local:
+	@test -f ./Libraries/release/libduckdb.dylib || { \
+		echo "Missing prebootstrapped macos/Libraries/release/libduckdb.dylib" >&2; \
+		exit 2; \
+	}
 
-## Clean duckdb build
-clean:
-	make -C $(DUCKDB_DIR) clean;
-
-duckdb: ## Clone DuckDb repo and apply patch
-	git clone --depth 1 --branch "$(VERSION)" $(DUCKDB_REPO) $(DUCKDB_DIR)
-
-release_x64: duckdb ## x64 osx build
-	@export OSX_BUILD_ARCH='x86_64'; \
-	export DUCKDB_PLATFORM=osx_amd64; \
-	export DUCKDB_EXTENSIONS='icu;parquet;json;fts;autocomplete'; \
-	make -C $(DUCKDB_DIR) GEN=ninja release; \
-	mv $(DUCKDB_DIR)/build/release/src/libduckdb.dylib ./Libraries/release/libduckdb_x64.dylib;
-
-release_arm64: duckdb ## arm64 osx build
-	@export OSX_BUILD_ARCH='arm64'; \
-	export DUCKDB_PLATFORM=osx_arm64; \
-	export DUCKDB_EXTENSIONS='icu;parquet;json;fts;autocomplete'; \
-	make -C $(DUCKDB_DIR) GEN=ninja release; \
-	mv $(DUCKDB_DIR)/build/release/src/libduckdb.dylib ./Libraries/release/libduckdb_arm64.dylib;
-
-release: release_arm64 clean release_x64 ## Universal osx release build
-	lipo -create ./Libraries/release/libduckdb_arm64.dylib ./Libraries/release/libduckdb_x64.dylib -output ./Libraries/release/libduckdb.dylib
-	rm -rf ./Libraries/release/libduckdb_arm64.dylib ./Libraries/release/libduckdb_x64.dylib
-	echo "Universal Release Build Complete"
-
-help: ## Display this help message
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
+help:
+	@printf '%s\n' \
+		'make package EXPECTED_WRAPPER_COMMIT=<S> OUTPUT_DIR=/fresh/output/path' \
+		'make check-local'
