@@ -114,7 +114,7 @@ tasks.register('verifyDuckDBJniLibs') {
         if (androidArtifacts.size() != 1) {
             throw new GradleException('Native artifact lock metadata must contain exactly one Android artifact.')
         }
-        def artifact = androidArtifacts.single()
+        def artifact = androidArtifacts[0]
         if (artifact.fileName != 'duckdb-android-arm64-v8a-x86_64.zip' ||
                 !(artifact.size instanceof Integer || artifact.size instanceof Long ||
                     artifact.size instanceof BigInteger) ||
