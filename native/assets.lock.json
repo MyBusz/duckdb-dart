@@ -1,0 +1,267 @@
+{
+  "schemaVersion": 1,
+  "releaseTag": "native-duckdb-1.4.2-r1",
+  "sourceCommit": "8ce8aed5107f8f8c1cb7d923a30b31b773b07d00",
+  "coreCommit": "68d7555f68bd25c1a251ccca2e6338949c33986a",
+  "toolchains": {
+    "flutter": "3.41.3",
+    "dart": "3.11.1",
+    "androidNdk": "28.2.13676358",
+    "buildTools": [
+      {
+        "name": "android-cmake",
+        "version": "3.22.1-g37088a8"
+      },
+      {
+        "name": "android-ninja",
+        "version": "1.10.2"
+      },
+      {
+        "name": "linux-cmake",
+        "version": "3.31.6"
+      },
+      {
+        "name": "linux-ninja",
+        "version": "1.13.2"
+      },
+      {
+        "name": "linux-clang",
+        "version": "14.0.0"
+      },
+      {
+        "name": "apple-cmake",
+        "version": "4.3.4"
+      },
+      {
+        "name": "apple-ninja",
+        "version": "1.13.2"
+      },
+      {
+        "name": "xcode",
+        "version": "16.4"
+      },
+      {
+        "name": "apple-clang",
+        "version": "17.0.0"
+      },
+      {
+        "name": "windows-cmake",
+        "version": "3.31.6"
+      },
+      {
+        "name": "visual-studio",
+        "version": "17.14.37411.7"
+      },
+      {
+        "name": "msvc",
+        "version": "19.44.35228.0"
+      }
+    ]
+  },
+  "staticExtensions": [
+    "icu",
+    "parquet",
+    "json"
+  ],
+  "licenses": [
+    {
+      "path": "LICENSE",
+      "identifier": "MIT"
+    },
+    {
+      "path": "licenses/duckdb/LICENSE",
+      "identifier": "MIT"
+    }
+  ],
+  "artifacts": [
+    {
+      "target": "android",
+      "fileName": "duckdb-android-arm64-v8a-x86_64.zip",
+      "size": 112135960,
+      "sha256": "02722346a7f9f966914e659feff1515addc57648242faf99c4166286238b59ad",
+      "supportedPlatforms": [
+        {
+          "platform": "android",
+          "architectures": [
+            "arm64-v8a",
+            "x86_64"
+          ],
+          "minimumOsVersion": "21"
+        }
+      ],
+      "members": [
+        {
+          "path": "arm64-v8a/libduckdb.so",
+          "size": 54586304,
+          "sha256": "327861607d3d3ed470f17abfba8b70c0935f12471985d813a5383caf46c9e972",
+          "installDestination": "android/src/main/jniLibs/arm64-v8a/libduckdb.so"
+        },
+        {
+          "path": "x86_64/libduckdb.so",
+          "size": 57549400,
+          "sha256": "ef2ac44be00fbb003697b206bb84a256a2d3be9864f228907c3d5e7701f39d5b",
+          "installDestination": "android/src/main/jniLibs/x86_64/libduckdb.so"
+        }
+      ]
+    },
+    {
+      "target": "ios",
+      "fileName": "duckdb-ios-xcframework.zip",
+      "size": 45778647,
+      "sha256": "c521d2d161a459e50584b7372afbb39067e65230cbf9137f4d728ca27aff0364",
+      "supportedPlatforms": [
+        {
+          "platform": "ios",
+          "architectures": [
+            "arm64"
+          ],
+          "minimumOsVersion": "13.0"
+        },
+        {
+          "platform": "ios-simulator",
+          "architectures": [
+            "arm64"
+          ],
+          "minimumOsVersion": "14.0"
+        },
+        {
+          "platform": "ios-simulator",
+          "architectures": [
+            "x86_64"
+          ],
+          "minimumOsVersion": "13.0"
+        }
+      ],
+      "members": [
+        {
+          "path": "duckdb.xcframework/Info.plist",
+          "size": 1178,
+          "sha256": "73ddedd5d9fe350ed98fc06b55b9d8f6e6599ada5ed0c6f078662d79ef413191",
+          "installDestination": "ios/Libraries/release/duckdb.xcframework/Info.plist"
+        },
+        {
+          "path": "duckdb.xcframework/ios-arm64/duckdb.framework/duckdb",
+          "size": 49026896,
+          "sha256": "47a4ca2ff0142715d1f0599664cea21ce7c55e9824e8675aa44d0a3f7d1bd343",
+          "installDestination": "ios/Libraries/release/duckdb.xcframework/ios-arm64/duckdb.framework/duckdb"
+        },
+        {
+          "path": "duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/duckdb",
+          "size": 102127568,
+          "sha256": "8868edfe7829110c02f5e7d3212d61f7ed0e45b4f86b7610305ac6efb1d4888d",
+          "installDestination": "ios/Libraries/release/duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/duckdb"
+        },
+        {
+          "path": "duckdb.xcframework/ios-arm64/duckdb.framework/Headers/duckdb.h",
+          "size": 190571,
+          "sha256": "bf840147dc70bb8238631023e95fa99c987a7744605a008bbb5b53a0446ae6ea",
+          "installDestination": "ios/Libraries/release/duckdb.xcframework/ios-arm64/duckdb.framework/Headers/duckdb.h"
+        },
+        {
+          "path": "duckdb.xcframework/ios-arm64/duckdb.framework/Info.plist",
+          "size": 778,
+          "sha256": "4ba1fc5bb6d21c81ffd65a1b1604ed0b0ebdaf76e6bace40c867b5d2656cb815",
+          "installDestination": "ios/Libraries/release/duckdb.xcframework/ios-arm64/duckdb.framework/Info.plist"
+        },
+        {
+          "path": "duckdb.xcframework/ios-arm64/duckdb.framework/Modules/module.modulemap",
+          "size": 92,
+          "sha256": "5dba39940baec900772343713e9605fafbbd8afa42386d5234235f9e57f4e2d3",
+          "installDestination": "ios/Libraries/release/duckdb.xcframework/ios-arm64/duckdb.framework/Modules/module.modulemap"
+        },
+        {
+          "path": "duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Headers/duckdb.h",
+          "size": 190571,
+          "sha256": "bf840147dc70bb8238631023e95fa99c987a7744605a008bbb5b53a0446ae6ea",
+          "installDestination": "ios/Libraries/release/duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Headers/duckdb.h"
+        },
+        {
+          "path": "duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Info.plist",
+          "size": 785,
+          "sha256": "acbf3da99e9f8811928789b00b011b632b2731acc9c8b9c713625400556321ed",
+          "installDestination": "ios/Libraries/release/duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Info.plist"
+        },
+        {
+          "path": "duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Modules/module.modulemap",
+          "size": 92,
+          "sha256": "5dba39940baec900772343713e9605fafbbd8afa42386d5234235f9e57f4e2d3",
+          "installDestination": "ios/Libraries/release/duckdb.xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Modules/module.modulemap"
+        }
+      ]
+    },
+    {
+      "target": "macos",
+      "fileName": "duckdb-macos-universal.zip",
+      "size": 31562138,
+      "sha256": "c88805c68f92b53389fbef66c8d422565a2e805ca11c05338e0a835ac13d69fc",
+      "supportedPlatforms": [
+        {
+          "platform": "macos",
+          "architectures": [
+            "x86_64"
+          ],
+          "minimumOsVersion": "10.15"
+        },
+        {
+          "platform": "macos",
+          "architectures": [
+            "arm64"
+          ],
+          "minimumOsVersion": "11.0"
+        }
+      ],
+      "members": [
+        {
+          "path": "libduckdb.dylib",
+          "size": 102510304,
+          "sha256": "4e1e434668f594df915dc85ffe6634c08d20f18621d10caa0a7c54d49d40f81b",
+          "installDestination": "macos/Libraries/release/libduckdb.dylib"
+        }
+      ]
+    },
+    {
+      "target": "linux",
+      "fileName": "duckdb-linux-x86_64.zip",
+      "size": 21153888,
+      "sha256": "19a4a021c7ea69bf34872c6f2e5290498897102e4d241a2c13ff948a920f98dc",
+      "supportedPlatforms": [
+        {
+          "platform": "linux",
+          "architectures": [
+            "x86_64"
+          ]
+        }
+      ],
+      "members": [
+        {
+          "path": "libduckdb.so",
+          "size": 70179912,
+          "sha256": "fea355b76bb1ccf055e713cb8c6c190c7888b9bd9d44914e544d9027c22aadc1",
+          "installDestination": "linux/Libraries/release/libduckdb.so"
+        }
+      ]
+    },
+    {
+      "target": "windows",
+      "fileName": "duckdb-windows-x64.zip",
+      "size": 11851636,
+      "sha256": "7d1977c0e74fde05dc0ac837aae13b4ac2366fdb9004a212ac09974272aecb2d",
+      "supportedPlatforms": [
+        {
+          "platform": "windows",
+          "architectures": [
+            "x64"
+          ]
+        }
+      ],
+      "members": [
+        {
+          "path": "duckdb.dll",
+          "size": 34413568,
+          "sha256": "76cd878d38fc7f271ba210d9d36f51edc345b5a2401ca6e899da04c7c2b09625",
+          "installDestination": "windows/Libraries/release/duckdb.dll"
+        }
+      ]
+    }
+  ]
+}
