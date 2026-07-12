@@ -103,7 +103,12 @@ class NativeArtifactVerifierTest
                     {'platform' => 'ios', 'architectures' => ['arm64'], 'minimumOsVersion' => '13.0'},
                     {
                       'platform' => 'ios-simulator',
-                      'architectures' => ['arm64', 'x86_64'],
+                      'architectures' => ['arm64'],
+                      'minimumOsVersion' => '14.0'
+                    },
+                    {
+                      'platform' => 'ios-simulator',
+                      'architectures' => ['x86_64'],
                       'minimumOsVersion' => '13.0'
                     }
                   ]
@@ -155,6 +160,32 @@ class NativeArtifactVerifierTest
 
     assert_raises(/wrong size|SHA-256/) do
       DuckdbNativeArtifactVerifier.verify!(plugin_root: @root, target: 'macos')
+    end
+  end
+
+  def test_rejects_wrong_missing_or_reordered_ios_slice_minima
+    members = install_ios_members
+    valid = artifact('ios', members)
+    variants = []
+
+    wrong = Marshal.load(Marshal.dump(valid))
+    wrong['supportedPlatforms'][1]['minimumOsVersion'] = '13.0'
+    variants << wrong
+
+    missing = Marshal.load(Marshal.dump(valid))
+    missing['supportedPlatforms'][2].delete('minimumOsVersion')
+    variants << missing
+
+    reordered = Marshal.load(Marshal.dump(valid))
+    reordered['supportedPlatforms'][1], reordered['supportedPlatforms'][2] =
+      reordered['supportedPlatforms'][2], reordered['supportedPlatforms'][1]
+    variants << reordered
+
+    variants.each do |candidate|
+      write_lock([candidate])
+      assert_raises(/invalid ios artifact identity/) do
+        DuckdbNativeArtifactVerifier.verify!(plugin_root: @root, target: 'ios')
+      end
     end
   end
 

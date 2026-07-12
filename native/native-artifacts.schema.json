@@ -344,21 +344,34 @@
                     "platform": { "const": "ios-simulator" },
                     "architectures": {
                       "type": "array",
-                      "prefixItems": [
-                        { "const": "arm64" },
-                        { "const": "x86_64" }
-                      ],
+                      "prefixItems": [{ "const": "arm64" }],
                       "items": false,
-                      "minItems": 2,
-                      "maxItems": 2
+                      "minItems": 1,
+                      "maxItems": 1
+                    },
+                    "minimumOsVersion": { "const": "14.0" }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["platform", "architectures", "minimumOsVersion"],
+                  "properties": {
+                    "platform": { "const": "ios-simulator" },
+                    "architectures": {
+                      "type": "array",
+                      "prefixItems": [{ "const": "x86_64" }],
+                      "items": false,
+                      "minItems": 1,
+                      "maxItems": 1
                     },
                     "minimumOsVersion": { "const": "13.0" }
                   }
                 }
               ],
               "items": false,
-              "minItems": 2,
-              "maxItems": 2
+              "minItems": 3,
+              "maxItems": 3
             },
             "members": {
               "type": "array",

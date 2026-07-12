@@ -24,7 +24,12 @@ module DuckdbNativeArtifactVerifier
       {'platform' => 'ios', 'architectures' => ['arm64'], 'minimumOsVersion' => '13.0'},
       {
         'platform' => 'ios-simulator',
-        'architectures' => ['arm64', 'x86_64'],
+        'architectures' => ['arm64'],
+        'minimumOsVersion' => '14.0'
+      },
+      {
+        'platform' => 'ios-simulator',
+        'architectures' => ['x86_64'],
         'minimumOsVersion' => '13.0'
       }
     ].freeze,

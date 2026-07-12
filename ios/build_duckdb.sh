@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly minimum_ios="13.0"
+readonly minimum_ios_device="13.0"
+readonly minimum_ios_simulator_arm64="14.0"
+readonly minimum_ios_simulator_x86_64="13.0"
 
 fail() {
   echo "build_duckdb.sh: $*" >&2
@@ -22,11 +24,23 @@ assert_architectures() {
 assert_macho() {
   local binary="$1" architecture="$2" platform="$3" minimum="$4" install_name="$5"
   local build_info
-  build_info="$(xcrun vtool -show-build -arch "$architecture" "$binary")"
-  grep -Eq "platform[[:space:]]+$platform([[:space:]]|$)" <<<"$build_info" || \
+  if ! build_info="$(xcrun vtool -show-build -arch "$architecture" "$binary" 2>&1)"; then
+    printf 'vtool -show-build output for %s (%s):\n%s\n' \
+      "$binary" "$architecture" "$build_info" >&2
+    fail "$binary ($architecture) could not be inspected with vtool"
+  fi
+  if [[ $(grep -Ec '^[[:space:]]*platform[[:space:]]+' <<<"$build_info") -ne 1 ]] || \
+      ! grep -Eq "^[[:space:]]*platform[[:space:]]+$platform([[:space:]]|$)" <<<"$build_info"; then
+    printf 'vtool -show-build output for %s (%s):\n%s\n' \
+      "$binary" "$architecture" "$build_info" >&2
     fail "$binary ($architecture) has the wrong Mach-O platform"
-  grep -Eq "minos[[:space:]]+$minimum(\.0)?([[:space:]]|$)" <<<"$build_info" || \
+  fi
+  if [[ $(grep -Ec '^[[:space:]]*minos[[:space:]]+' <<<"$build_info") -ne 1 ]] || \
+      ! grep -Eq "^[[:space:]]*minos[[:space:]]+$minimum(\.0)?([[:space:]]|$)" <<<"$build_info"; then
+    printf 'vtool -show-build output for %s (%s):\n%s\n' \
+      "$binary" "$architecture" "$build_info" >&2
     fail "$binary ($architecture) has the wrong minimum OS version"
+  fi
   xcrun otool -D -arch "$architecture" "$binary" | grep -Fq "$install_name" || \
     fail "$binary ($architecture) has the wrong install name"
   xcrun nm -arch "$architecture" -gU "$binary" | grep -E '[[:space:]]_duckdb_open$' >/dev/null || \
@@ -47,7 +61,7 @@ remove_signature() {
 }
 
 build_slice() {
-  local name="$1" sdk="$2" architecture="$3" explicit_platform="$4"
+  local name="$1" sdk="$2" architecture="$3" minimum="$4" explicit_platform="$5"
   local build_dir="$work_dir/build-$name"
   local configure_log="$work_dir/configure-$name.log"
   run_sanitized_cmake_configure \
@@ -69,7 +83,7 @@ build_slice() {
     -DCMAKE_SYSTEM_NAME=iOS \
     -DCMAKE_OSX_SYSROOT="$sdk" \
     -DCMAKE_OSX_ARCHITECTURES="$architecture" \
-    -DCMAKE_OSX_DEPLOYMENT_TARGET="$minimum_ios" \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET="$minimum" \
     -DDUCKDB_EXPLICIT_PLATFORM="$explicit_platform" \
     '-DBUILD_EXTENSIONS=icu;parquet;json' \
     -DBUILD_SHELL=OFF \
@@ -84,7 +98,7 @@ build_slice() {
     -DSET_DUCKDB_LIBRARY_VERSION=OFF \
     -DOVERRIDE_GIT_DESCRIBE=v1.4.2 2>&1 | tee "$configure_log"
   assert_static_extensions_configured "$configure_log"
-  assert_sanitized_cmake_cache "$build_dir" "$architecture" "$sdk" "$minimum_ios"
+  assert_sanitized_cmake_cache "$build_dir" "$architecture" "$sdk" "$minimum"
   grep -q 'CMAKE_CXX_COMPILER_ID "AppleClang"' \
     "$build_dir"/CMakeFiles/*/CMakeCXXCompiler.cmake || \
     fail "CMake did not select Apple Clang for $name"
@@ -97,7 +111,7 @@ build_slice() {
 }
 
 make_framework() {
-  local destination="$1" platform_name="$2" binary="$3"
+  local destination="$1" platform_name="$2" minimum="$3" binary="$4"
   mkdir -p "$destination/Headers" "$destination/Modules"
   cp "$binary" "$destination/duckdb"
   chmod 755 "$destination/duckdb"
@@ -123,7 +137,7 @@ MODULEMAP
   <key>CFBundleShortVersionString</key><string>1.4.2</string>
   <key>CFBundleVersion</key><string>1.4.2</string>
   <key>CFBundleSupportedPlatforms</key><array><string>$platform_name</string></array>
-  <key>MinimumOSVersion</key><string>$minimum_ios</string>
+  <key>MinimumOSVersion</key><string>$minimum</string>
 </dict>
 </plist>
 PLIST
@@ -147,15 +161,15 @@ output_dir="$(prepare_fresh_output_directory "$2")"
 work_dir="$(mktemp -d "${TMPDIR:-/tmp}/duckdb-ios.XXXXXX")"
 trap 'rm -rf "$work_dir"' EXIT
 
-build_slice device-arm64 iphoneos arm64 osx_arm64
-build_slice simulator-arm64 iphonesimulator arm64 osx_arm64
-build_slice simulator-x86_64 iphonesimulator x86_64 osx_amd64
+build_slice device-arm64 iphoneos arm64 "$minimum_ios_device" osx_arm64
+build_slice simulator-arm64 iphonesimulator arm64 "$minimum_ios_simulator_arm64" osx_arm64
+build_slice simulator-x86_64 iphonesimulator x86_64 "$minimum_ios_simulator_x86_64" osx_amd64
 
 frameworks="$work_dir/frameworks"
 device_framework="$frameworks/device/duckdb.framework"
 simulator_framework="$frameworks/simulator/duckdb.framework"
-make_framework "$device_framework" iPhoneOS "$work_dir/device-arm64.dylib"
-make_framework "$simulator_framework" iPhoneSimulator "$work_dir/simulator-arm64.dylib"
+make_framework "$device_framework" iPhoneOS "$minimum_ios_device" "$work_dir/device-arm64.dylib"
+make_framework "$simulator_framework" iPhoneSimulator "$minimum_ios_simulator_arm64" "$work_dir/simulator-arm64.dylib"
 xcrun lipo -create \
   "$work_dir/simulator-arm64.dylib" \
   "$work_dir/simulator-x86_64.dylib" \
@@ -164,9 +178,9 @@ remove_signature "$simulator_framework/duckdb"
 
 assert_architectures "$device_framework/duckdb" arm64
 assert_architectures "$simulator_framework/duckdb" arm64 x86_64
-assert_macho "$device_framework/duckdb" arm64 IOS "$minimum_ios" '@rpath/duckdb.framework/duckdb'
-assert_macho "$simulator_framework/duckdb" arm64 IOSSIMULATOR "$minimum_ios" '@rpath/duckdb.framework/duckdb'
-assert_macho "$simulator_framework/duckdb" x86_64 IOSSIMULATOR "$minimum_ios" '@rpath/duckdb.framework/duckdb'
+assert_macho "$device_framework/duckdb" arm64 IOS "$minimum_ios_device" '@rpath/duckdb.framework/duckdb'
+assert_macho "$simulator_framework/duckdb" arm64 IOSSIMULATOR "$minimum_ios_simulator_arm64" '@rpath/duckdb.framework/duckdb'
+assert_macho "$simulator_framework/duckdb" x86_64 IOSSIMULATOR "$minimum_ios_simulator_x86_64" '@rpath/duckdb.framework/duckdb'
 
 xcframework="$work_dir/package/duckdb.xcframework"
 mkdir -p "$(dirname "$xcframework")"
@@ -175,7 +189,10 @@ xcodebuild -create-xcframework \
   -framework "$simulator_framework" \
   -output "$xcframework"
 
-python3 - "$xcframework/Info.plist" <<'PY'
+python3 - \
+  "$xcframework/Info.plist" \
+  "$xcframework/ios-arm64/duckdb.framework/Info.plist" \
+  "$xcframework/ios-arm64_x86_64-simulator/duckdb.framework/Info.plist" <<'PY'
 import plistlib
 import sys
 
@@ -198,16 +215,27 @@ for identifier, (platform, variant, architectures) in expected.items():
         raise SystemExit(f"wrong SupportedPlatformVariant for {identifier}")
     if set(item.get("SupportedArchitectures", [])) != architectures:
         raise SystemExit(f"wrong SupportedArchitectures for {identifier}")
-print("XCFramework identifiers and architecture arrays verified")
+frameworks = {
+    sys.argv[2]: ("iPhoneOS", "13.0"),
+    sys.argv[3]: ("iPhoneSimulator", "14.0"),
+}
+for path, (platform, minimum) in frameworks.items():
+    with open(path, "rb") as source:
+        framework = plistlib.load(source)
+    if framework.get("CFBundleSupportedPlatforms") != [platform]:
+        raise SystemExit(f"wrong CFBundleSupportedPlatforms in {path}")
+    if framework.get("MinimumOSVersion") != minimum:
+        raise SystemExit(f"wrong MinimumOSVersion in {path}")
+print("XCFramework identifiers, architectures, and framework minima verified")
 PY
 
 final_device="$xcframework/ios-arm64/duckdb.framework/duckdb"
 final_simulator="$xcframework/ios-arm64_x86_64-simulator/duckdb.framework/duckdb"
 assert_architectures "$final_device" arm64
 assert_architectures "$final_simulator" arm64 x86_64
-assert_macho "$final_device" arm64 IOS "$minimum_ios" '@rpath/duckdb.framework/duckdb'
-assert_macho "$final_simulator" arm64 IOSSIMULATOR "$minimum_ios" '@rpath/duckdb.framework/duckdb'
-assert_macho "$final_simulator" x86_64 IOSSIMULATOR "$minimum_ios" '@rpath/duckdb.framework/duckdb'
+assert_macho "$final_device" arm64 IOS "$minimum_ios_device" '@rpath/duckdb.framework/duckdb'
+assert_macho "$final_simulator" arm64 IOSSIMULATOR "$minimum_ios_simulator_arm64" '@rpath/duckdb.framework/duckdb'
+assert_macho "$final_simulator" x86_64 IOSSIMULATOR "$minimum_ios_simulator_x86_64" '@rpath/duckdb.framework/duckdb'
 [[ ! -e "$xcframework/ios-arm64/duckdb.framework/_CodeSignature" ]] || fail "device framework is signed"
 [[ ! -e "$xcframework/ios-arm64_x86_64-simulator/duckdb.framework/_CodeSignature" ]] || fail "simulator framework is signed"
 

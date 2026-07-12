@@ -60,7 +60,7 @@ The fixed platform mapping is:
 | Target | Required architectures | Install root |
 | --- | --- | --- |
 | Android | `arm64-v8a`, `x86_64`, API 21+ | `android/src/main/jniLibs` |
-| iOS | device `arm64`; simulator `arm64`, `x86_64`; iOS 13+ | `ios/Libraries/release` |
+| iOS | device `arm64` 13.0+; simulator `arm64` 14.0+, `x86_64` 13.0+ | `ios/Libraries/release` |
 | macOS | `x86_64` 10.15+; `arm64` 11.0+ | `macos/Libraries/release` |
 | Linux | `x86_64` | `linux/Libraries/release` |
 | Windows | `x64` | `windows/Libraries/release` |
@@ -72,6 +72,12 @@ device and simulator `duckdb.framework/duckdb` binaries for iOS;
 Windows. Real packages may declare additional exact members after these
 ordered essential members. Every declared member is verified and installed at
 the fixed install root plus its unchanged archive path.
+
+The iOS manifest uses three ordered platform records because simulator slices
+have different encoded Mach-O minimum versions: device `arm64`/13.0, simulator
+`arm64`/14.0, then simulator `x86_64`/13.0. The two simulator records describe
+the architecture union in the single universal simulator XCFramework member;
+its framework `MinimumOSVersion` is the conservative scalar aggregate 14.0.
 
 Archive member paths and install destinations are normalized relative POSIX
 paths. Absolute paths, drive paths, backslashes, empty segments, `.` and `..`

@@ -47,6 +47,23 @@ void main() {
       'linux',
       'windows',
     ]);
+    expect(manifest.artifactFor('ios').json['supportedPlatforms'], <Object?>[
+      <String, Object?>{
+        'platform': 'ios',
+        'architectures': <String>['arm64'],
+        'minimumOsVersion': '13.0',
+      },
+      <String, Object?>{
+        'platform': 'ios-simulator',
+        'architectures': <String>['arm64'],
+        'minimumOsVersion': '14.0',
+      },
+      <String, Object?>{
+        'platform': 'ios-simulator',
+        'architectures': <String>['x86_64'],
+        'minimumOsVersion': '13.0',
+      },
+    ]);
     final toolchains = manifest.json['toolchains']! as Map<String, Object?>;
     final tools = toolchains['buildTools']! as List<Object?>;
     expect(tools[4], <String, Object?>{
@@ -102,6 +119,37 @@ void main() {
       final platforms = artifact['supportedPlatforms']! as List<Object?>;
       final platform = platforms.first! as Map<String, Object?>;
       platform['architectures'] = ['arm64-v8a'];
+    },
+    'wrong iOS simulator arm64 minimum': (json) {
+      final artifacts = json['artifacts']! as List<Object?>;
+      final ios = artifacts[1]! as Map<String, Object?>;
+      final platforms = ios['supportedPlatforms']! as List<Object?>;
+      (platforms[1]! as Map<String, Object?>)['minimumOsVersion'] = '13.0';
+    },
+    'missing iOS simulator x86_64 minimum': (json) {
+      final artifacts = json['artifacts']! as List<Object?>;
+      final ios = artifacts[1]! as Map<String, Object?>;
+      final platforms = ios['supportedPlatforms']! as List<Object?>;
+      (platforms[2]! as Map<String, Object?>).remove('minimumOsVersion');
+    },
+    'reordered iOS simulator per-architecture records': (json) {
+      final artifacts = json['artifacts']! as List<Object?>;
+      final ios = artifacts[1]! as Map<String, Object?>;
+      final platforms = ios['supportedPlatforms']! as List<Object?>;
+      final arm64 = platforms[1];
+      platforms[1] = platforms[2];
+      platforms[2] = arm64;
+    },
+    'missing iOS simulator architecture record': (json) {
+      final artifacts = json['artifacts']! as List<Object?>;
+      final ios = artifacts[1]! as Map<String, Object?>;
+      (ios['supportedPlatforms']! as List<Object?>).removeLast();
+    },
+    'extra iOS simulator architecture record': (json) {
+      final artifacts = json['artifacts']! as List<Object?>;
+      final ios = artifacts[1]! as Map<String, Object?>;
+      final platforms = ios['supportedPlatforms']! as List<Object?>;
+      platforms.add(jsonDecode(jsonEncode(platforms.last)));
     },
     'escaping install destination': (json) {
       final artifact =

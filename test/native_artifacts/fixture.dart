@@ -135,7 +135,8 @@ Map<String, Object?> syntheticManifest() => <String, Object?>{
           target: 'ios',
           supportedPlatforms: [
             platform('ios', ['arm64'], minimum: '13.0'),
-            platform('ios-simulator', ['arm64', 'x86_64'], minimum: '13.0'),
+            platform('ios-simulator', ['arm64'], minimum: '14.0'),
+            platform('ios-simulator', ['x86_64'], minimum: '13.0'),
           ],
           members: [
             memberJson('ios', 'duckdb.xcframework/Info.plist'),

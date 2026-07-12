@@ -82,6 +82,27 @@ class GenerateCandidateTest(unittest.TestCase):
             list(generator.ORDERED_TOOLS),
         )
         self.assertEqual([item["target"] for item in manifest["artifacts"]], list(generator.ARCHIVES))
+        ios = manifest["artifacts"][1]
+        self.assertEqual(
+            ios["supportedPlatforms"],
+            [
+                {
+                    "platform": "ios",
+                    "architectures": ["arm64"],
+                    "minimumOsVersion": "13.0",
+                },
+                {
+                    "platform": "ios-simulator",
+                    "architectures": ["arm64"],
+                    "minimumOsVersion": "14.0",
+                },
+                {
+                    "platform": "ios-simulator",
+                    "architectures": ["x86_64"],
+                    "minimumOsVersion": "13.0",
+                },
+            ],
+        )
 
     def test_preserves_archive_bytes(self) -> None:
         output = self._generate()
