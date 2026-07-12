@@ -124,7 +124,11 @@ assert_macho "$universal" x86_64 10.15
 assert_macho "$universal" arm64 11.0
 
 smoke_binary="$work_dir/duckdb-macos-smoke"
+macos_sdk="$(xcrun --sdk macosx --show-sdk-path)"
 "$APPLE_CLANG" -std=c11 -Wall -Wextra -Werror \
+  -isysroot "$macos_sdk" \
+  -arch x86_64 \
+  -mmacosx-version-min=10.15 \
   -I"$duckdb_source/src/include" \
   "$script_dir/smoke_duckdb.c" \
   -o "$smoke_binary"
