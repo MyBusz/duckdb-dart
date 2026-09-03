@@ -38,11 +38,6 @@ Map<K, V?> mapTransformer<K, V>(
   final valueLogicalType = valueVector.logicalType();
 
   try {
-    // Get transformers for key and value types
-    final keyTransformer = getTransformerForType<K>(keyLogicalType.dataType);
-    final valueTransformer =
-        getTransformerForType<V>(valueLogicalType.dataType);
-
     // Get data pointers for key and value vectors
     final keyDataPtr = bindings.duckdb_vector_get_data(keyVector);
     final valueDataPtr = bindings.duckdb_vector_get_data(valueVector);
@@ -70,7 +65,7 @@ Map<K, V?> mapTransformer<K, V>(
       );
 
       // Transform the key
-      final key = keyTransformer(
+      final key = transformLogicalVectorValue(
         bindings,
         keyDataPtr,
         elementIndex,
@@ -85,7 +80,7 @@ Map<K, V?> mapTransformer<K, V>(
       // Transform the value
       final value = isValueNull
           ? null
-          : valueTransformer(
+          : transformLogicalVectorValue(
               bindings,
               valueDataPtr,
               elementIndex,

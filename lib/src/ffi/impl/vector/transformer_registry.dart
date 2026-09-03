@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:typed_data';
 
@@ -23,6 +24,35 @@ typedef VectorTransformer<T> = T? Function(
   duckdb_vector handle,
   LogicalType logicalType,
 );
+
+/// Reads one vector value while preserving DuckDB logical-type aliases.
+///
+/// JSON is physically represented as VARCHAR by the C API. Nested vectors do
+/// not pass through [ResultSetImpl.operator []], so they need this narrow
+/// alias-aware path to retain the public [JsonValue] contract.
+Object? transformLogicalVectorValue(
+  Bindings bindings,
+  Pointer dataPtr,
+  int offsetIndex,
+  duckdb_vector handle,
+  LogicalType logicalType,
+) {
+  final transformer = getTransformerForType<Object?>(logicalType.dataType);
+  final value = transformer(
+    bindings,
+    dataPtr,
+    offsetIndex,
+    handle,
+    logicalType,
+  );
+  if (!logicalType.isJson || value is! String) return value;
+
+  try {
+    return JsonValue(jsonDecode(value));
+  } catch (_) {
+    return JsonValue(value, isValid: false);
+  }
+}
 
 // duckdb strings are stored differently based upon their length
 // if the string is less than or equal to 12 characters, it is stored inline

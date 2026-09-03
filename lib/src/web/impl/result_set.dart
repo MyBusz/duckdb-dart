@@ -14,6 +14,9 @@ class ResultSetImpl extends ResultSet {
         _jsonColumnIndices = jsonColumnIndices;
 
   @override
+  bool get isStreaming => false;
+
+  @override
   Column operator [](int index) {
     if (index < 0 || index >= columnCount) {
       throw RangeError('Column index out of range: $index');

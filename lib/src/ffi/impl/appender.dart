@@ -8,14 +8,20 @@ part of 'implementation.dart';
 class _FinalizableAppender extends FinalizablePart {
   final Bindings _bindings;
   final Pointer<duckdb_appender> _handle;
+  final _StreamingLease _streamingLease;
+  bool _isDisposed = false;
 
-  _FinalizableAppender(this._bindings, this._handle);
+  _FinalizableAppender(this._bindings, this._handle, this._streamingLease);
 
   @override
   void dispose() {
+    if (_isDisposed) return;
+    _isDisposed = true;
+
     /// close, flush, free memory
     _bindings.duckdb_appender_destroy(_handle);
     _handle.free();
+    _streamingLease.unregisterAppender();
   }
 }
 
@@ -30,25 +36,60 @@ class AppenderImpl extends Appender {
 
   bool _isClosed = false;
 
-  AppenderImpl._(this._bindings, Pointer<duckdb_appender> handle)
-      : _finalizable = _FinalizableAppender(_bindings, handle) {
+  AppenderImpl._(
+    this._bindings,
+    Pointer<duckdb_appender> handle,
+    _StreamingLease streamingLease,
+  ) : _finalizable = _FinalizableAppender(_bindings, handle, streamingLease) {
     _finalizer.attach(this, _finalizable, detach: this);
   }
 
   factory AppenderImpl.withConnection(
-    Connection connection,
+    ConnectionImpl connection,
     String table,
     String? schema,
   ) {
+    final bindings = (duckdb as DuckDB).bindings;
     final outAppender = allocate<duckdb_appender>();
+    final schemaPointer = schema?.toNativeUtf8().cast<Char>();
+    final tablePointer = table.toNativeUtf8().cast<Char>();
+    var created = false;
 
-    (duckdb as DuckDB).bindings.duckdb_appender_create(
-          (connection.handle as Pointer<duckdb_connection>).value,
-          (schema ?? "").toNativeUtf8() as Pointer<Char>,
-          table.toNativeUtf8() as Pointer<Char>,
-          outAppender,
-        );
-    return AppenderImpl._((duckdb as DuckDB).bindings, outAppender);
+    try {
+      final state = bindings.duckdb_appender_create(
+        connection.handle.value,
+        schemaPointer ?? Pointer<Char>.fromAddress(0),
+        tablePointer,
+        outAppender,
+      );
+      if (state != duckdb_state.DuckDBSuccess ||
+          outAppender.value.isNullPointer) {
+        final error = outAppender.value.isNullPointer
+            ? null
+            : bindings.duckdb_appender_error(outAppender.value);
+        final message = error == null || error.isNullPointer
+            ? 'Could not create appender for table "$table".'
+            : error.readString();
+
+        if (!outAppender.value.isNullPointer) {
+          bindings.duckdb_appender_destroy(outAppender);
+        }
+        throw DuckDBException(message);
+      }
+
+      created = true;
+      return AppenderImpl._(
+        bindings,
+        outAppender,
+        connection._streamingLease,
+      );
+    } finally {
+      schemaPointer?.free();
+      tablePointer.free();
+      if (!created) {
+        outAppender.free();
+      }
+    }
   }
 
   @override

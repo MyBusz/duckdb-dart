@@ -78,6 +78,38 @@ abstract class PreparedStatement {
   /// or null if the operation was cancelled.
   Future<ResultSet?> executePending({DuckDBCancellationToken? token});
 
+  /// Executes the prepared statement using DuckDB's native streaming result
+  /// interface.
+  ///
+  /// The returned [ResultSet] reports whether DuckDB actually selected a
+  /// streaming result through [ResultSet.isStreaming]. A materialized fallback
+  /// retains the normal result-set APIs. For a streaming result, consume the
+  /// one-shot [ResultSet.fetchAllStream] and always dispose the result when
+  /// leaving the stream early:
+  ///
+  /// ```dart
+  /// final result = await statement.executeStreaming();
+  /// try {
+  ///   await for (final row in result.fetchAllStream()) {
+  ///     // Process row.
+  ///   }
+  /// } finally {
+  ///   await result.dispose();
+  /// }
+  /// ```
+  ///
+  /// Breaking or cancelling a streaming subscription does not release the
+  /// connection lease; [ResultSet.dispose] does.
+  ///
+  /// When [requireNativeStreaming] is true, only a prepared `SELECT` is
+  /// accepted. The call fails before execution for every other statement type.
+  /// If DuckDB still returns a materialized result for an accepted `SELECT`, it
+  /// is disposed and the call fails rather than exposing a non-streaming result.
+  Future<ResultSet> executeStreaming({
+    DuckDBCancellationToken? token,
+    bool requireNativeStreaming = false,
+  });
+
   /// Clear the params bound to the prepared statement.
   void clearBinding();
 

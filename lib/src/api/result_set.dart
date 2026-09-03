@@ -8,6 +8,13 @@ import 'package:dart_duckdb/src/api/database_type.dart';
 ///
 /// A result set is organized into vertical table slices called columns.
 abstract class ResultSet {
+  /// Whether this result uses DuckDB's native streaming interface.
+  ///
+  /// A streaming result has eagerly cached metadata but no random-access or
+  /// materialization APIs. Consume its one-shot [fetchAllStream] and dispose it
+  /// explicitly when leaving the stream before EOF.
+  bool get isStreaming;
+
   /// The number of columns in the result set
   int get columnCount;
 
@@ -47,14 +54,16 @@ abstract class ResultSet {
   ///
   /// This is an async generator that produces rows one at a time,
   /// allowing for memory-efficient processing of large result sets.
-  /// The stream can be interrupted at any time by canceling the subscription
-  /// or breaking from the await-for loop.
+  /// Materialized results can be interrupted at any time by canceling the
+  /// subscription or breaking from the await-for loop. For native streaming
+  /// results, breaking or cancelling leaves the connection leased; use
+  /// `try`/`finally` and call [dispose] explicitly.
   ///
   /// Example:
   /// ```dart
   /// await for (final row in resultSet.fetchAllStream()) {
   ///   // Process row
-  ///   if (someCondition) break; // Stop processing
+  ///   if (someCondition) break; // Dispose the result in finally.
   /// }
   /// ```
   ///

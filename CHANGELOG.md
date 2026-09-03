@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add native prepared-statement result streaming with explicit lifecycle
+  management.
+- Add an opt-in `requireNativeStreaming` guard for prepared `SELECT`
+  statements.
+
 ## 1.4.4
 
 - upgrade duckdb binaries to 1.4.2

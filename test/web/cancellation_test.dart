@@ -21,6 +21,17 @@ void main() {
       final result = await connection.query('SELECT 1', token: token);
       final rows = result.fetchAll();
       expect(rows.first.first, equals(1));
+      expect(result.isStreaming, isFalse);
+    });
+
+    test('does not expose native result streaming', () async {
+      final statement = await connection.prepare('SELECT 1');
+
+      expect(() => statement.executeStreaming(), throwsUnsupportedError);
+      expect(
+        () => statement.executeStreaming(requireNativeStreaming: true),
+        throwsUnsupportedError,
+      );
     });
 
     test('cancellation token can be reused', () async {

@@ -37,18 +37,13 @@ Object? unionTransformer(
     final memberLogicalType = memberVectorHandle.logicalType();
 
     try {
-      // Get transformer for the active member's type
-      final memberTransformer = getTransformerForType(
-        memberLogicalType.dataType,
-      );
-
       // Check if the member value is null
       final validityMasks =
           bindings.duckdb_vector_get_validity(memberVectorHandle);
       if (validityMasks.isElementNull(offsetIndex)) return null;
 
       // Transform and return the member value
-      return memberTransformer(
+      return transformLogicalVectorValue(
         bindings,
         bindings.duckdb_vector_get_data(memberVectorHandle),
         offsetIndex,

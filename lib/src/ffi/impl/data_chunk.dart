@@ -40,6 +40,11 @@ class DataChunkImpl {
   }
 
   factory DataChunkImpl.withResult(ResultSet result, int index) {
+    if (result.isStreaming) {
+      throw StateError(
+        'Random data-chunk access is not available on a native streaming result.',
+      );
+    }
     final bindings = (duckdb as DuckDB).bindings;
 
     final dataChunk = allocate<duckdb_data_chunk>();
@@ -56,6 +61,11 @@ class DataChunkImpl {
 
   /// Sets the data chunk to the specified index in the result set.
   void setIndex(ResultSet result, int index) {
+    if (result.isStreaming) {
+      throw StateError(
+        'Random data-chunk access is not available on a native streaming result.',
+      );
+    }
     // Update the handle to point to the new chunk
     _bindings.duckdb_destroy_data_chunk(_finalizable._handle);
     _finalizable._handle.value = Pointer.fromAddress(

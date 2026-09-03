@@ -39,12 +39,8 @@ Map<String, T?> structTransformer<T>(
       final childLogicalType = child.logicalType();
 
       try {
-        final transformer = getTransformerForType(
-          childLogicalType.dataType,
-        );
-
         final childDataPtr = bindings.duckdb_vector_get_data(child);
-        fields[childName] = transformer(
+        fields[childName] = transformLogicalVectorValue(
           bindings,
           childDataPtr,
           offsetIndex,

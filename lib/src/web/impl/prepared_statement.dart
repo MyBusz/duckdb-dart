@@ -73,6 +73,16 @@ class PreparedStatementImpl extends PreparedStatement {
   }
 
   @override
+  Future<ResultSet> executeStreaming({
+    DuckDBCancellationToken? token,
+    bool requireNativeStreaming = false,
+  }) {
+    throw UnsupportedError(
+      'Native DuckDB result streaming is not supported on the web platform.',
+    );
+  }
+
+  @override
   int get parameterCount => _bindings.length;
 
   @override

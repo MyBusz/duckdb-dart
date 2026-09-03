@@ -18,6 +18,29 @@ class _FinalizablePreparedStatement extends FinalizablePart {
   }
 }
 
+/// Keeps a cancellation token from retaining a connection after a streaming
+/// execution handoff has settled.
+class _StreamingExecutionCancellationGate {
+  ConnectionImpl? _connection;
+  bool _isCancelled = false;
+
+  _StreamingExecutionCancellationGate(this._connection);
+
+  bool get isCancelled => _isCancelled;
+
+  void cancel() {
+    _isCancelled = true;
+    final connection = _connection;
+    if (connection != null && !connection._isClosed) {
+      connection._bindings.duckdb_interrupt(connection._handle.value);
+    }
+  }
+
+  void clear() {
+    _connection = null;
+  }
+}
+
 class PreparedStatementImpl extends PreparedStatement
     with DatabaseOperationCancellation {
   final Bindings _bindings;
@@ -25,6 +48,9 @@ class PreparedStatementImpl extends PreparedStatement
   final _FinalizablePreparedStatement _finalizable;
   final Finalizer<FinalizablePart> _finalizer = disposeFinalizer;
   bool _isClosed = false;
+  bool _isDisposing = false;
+  bool _isStreamingInFlight = false;
+  Future<void>? _streamingHandoff;
 
   /// Cache the fixed values to make lookups fast.
   int? _parameterCount;
@@ -81,28 +107,67 @@ class PreparedStatementImpl extends PreparedStatement
     );
   }
 
-  @override
-  Future<void> dispose() async {
-    if (_isClosed) return;
+  ConnectionImpl _connectionOrThrow() {
+    final connection = _connectionRef.target;
+    if (connection == null) {
+      throw StateError('Connection no longer exists');
+    }
+    return connection;
+  }
 
-    _finalizer.detach(this);
-    _isClosed = true;
+  void _ensureUsable() {
+    if (_isClosed || _isDisposing) {
+      throw StateError('PreparedStatement is closed');
+    }
+    if (_isStreamingInFlight) {
+      throw StateError(
+        'PreparedStatement is executing a native streaming result.',
+      );
+    }
+    final connection = _connectionOrThrow();
+    connection._ensureOpen();
+    connection._streamingLease.ensureConnectionOperationAllowed();
+  }
 
-    _finalizable.dispose();
+  void _ensureExecutable() {
+    _ensureUsable();
   }
 
   @override
-  int get parameterCount =>
-      _parameterCount ??= _bindings.duckdb_nparams(_handle.value);
+  Future<void> dispose() async {
+    if (_isClosed || _isDisposing) return;
+
+    _isDisposing = true;
+    try {
+      // The streaming operation owns the prepared-statement pointer until its
+      // output result has either been destroyed or handed to a result object.
+      // Do not make the pointer available to DuckDB's destructor before that.
+      await _streamingHandoff;
+
+      _finalizer.detach(this);
+      _isClosed = true;
+      _finalizable.dispose();
+    } finally {
+      _isDisposing = false;
+    }
+  }
+
+  @override
+  int get parameterCount {
+    _ensureUsable();
+    return _parameterCount ??= _bindings.duckdb_nparams(_handle.value);
+  }
 
   @override
   DatabaseTypeNative parameterType(int index) {
+    _ensureUsable();
     return DatabaseTypeNative
         .values[_bindings.duckdb_param_type(_handle.value, index).value];
   }
 
   @override
   void bind(Object? param, int index) {
+    _ensureUsable();
     final preparedStatement = _handle.value;
 
     if (param == null) {
@@ -322,6 +387,7 @@ class PreparedStatementImpl extends PreparedStatement
 
   @override
   void bindParams(List params) {
+    _ensureUsable();
     for (var i = 0; i < params.length; i++) {
       bind(params[i], i + 1);
     }
@@ -329,11 +395,13 @@ class PreparedStatementImpl extends PreparedStatement
 
   @override
   void bindNamed(Object? param, String name) {
+    _ensureUsable();
     bind(param, _namedParameters.indexOf(name) + 1);
   }
 
   @override
   void bindNamedParams(Map<String, Object?> params) {
+    _ensureUsable();
     for (final entry in params.entries) {
       bindNamed(entry.value, entry.key);
     }
@@ -341,6 +409,7 @@ class PreparedStatementImpl extends PreparedStatement
 
   @override
   void clearBinding() {
+    _ensureUsable();
     final bindResult = _bindings.duckdb_clear_bindings(_handle.value);
     if (bindResult != duckdb_state.DuckDBSuccess) {
       final errorMessage = _bindings
@@ -353,10 +422,7 @@ class PreparedStatementImpl extends PreparedStatement
 
   @override
   Future<ResultSet> execute({DuckDBCancellationToken? token}) async {
-    if (_isClosed) throw StateError('PreparedStatement is closed');
-
-    final connection = _connectionRef.target;
-    if (connection == null) throw StateError('Connection no longer exists');
+    _ensureExecutable();
 
     return runWithCancellation(
       operation: ExecutePreparedOperation(
@@ -386,10 +452,7 @@ class PreparedStatementImpl extends PreparedStatement
   Future<ResultSet?> executePending({
     DuckDBCancellationToken? token,
   }) async {
-    if (_isClosed) throw StateError('PreparedStatement is closed');
-
-    final connection = _connectionRef.target;
-    if (connection == null) throw StateError('Connection no longer exists');
+    _ensureExecutable();
 
     return runWithCancellation(
       operation: ExecutePreparedPendingOperation(
@@ -413,6 +476,175 @@ class PreparedStatementImpl extends PreparedStatement
       operationDescription: 'execute pending prepared statement',
       token: token,
     );
+  }
+
+  @override
+  Future<ResultSet> executeStreaming({
+    DuckDBCancellationToken? token,
+    bool requireNativeStreaming = false,
+  }) {
+    _ensureExecutable();
+    if (requireNativeStreaming &&
+        _bindings.duckdb_prepared_statement_type(_handle.value) !=
+            duckdb_statement_type.DUCKDB_STATEMENT_TYPE_SELECT) {
+      throw StateError(
+        'Native streaming is only guaranteed for prepared SELECT statements.',
+      );
+    }
+    if (token?.isCancelled ?? false) {
+      throw DuckDBCancelledException('Operation cancelled');
+    }
+
+    final connection = _connectionOrThrow();
+    connection._beginStreamingExecution();
+    _isStreamingInFlight = true;
+
+    final execution = _executeStreaming(
+      connection,
+      token,
+      requireNativeStreaming,
+    );
+    final handoff = execution.then<void>(
+      (_) {},
+      onError: (Object error, StackTrace stackTrace) {},
+    );
+    _streamingHandoff = handoff;
+    connection._trackStreamingHandoff(handoff);
+    unawaited(
+      handoff.then(
+        (_) {
+          _isStreamingInFlight = false;
+        },
+      ),
+    );
+    return execution;
+  }
+
+  Future<ResultSet> _executeStreaming(
+    ConnectionImpl connection,
+    DuckDBCancellationToken? token,
+    bool requireNativeStreaming,
+  ) async {
+    final cancellationGate = _StreamingExecutionCancellationGate(connection);
+    // This isolate owns the output cell from allocation until it is handed to
+    // a result object or safely destroyed. Worker operations only fill it.
+    final result = calloc<duckdb_result>();
+    var resultTransferred = false;
+    var resultDestroyed = false;
+
+    if (token != null) {
+      unawaited(
+        token.cancelled.then(
+          (_) {
+            cancellationGate.cancel();
+          },
+        ),
+      );
+    }
+
+    Future<void> destroyUnexposedResult() async {
+      if (resultDestroyed || resultTransferred) return;
+      await connection._destroyUnexposedStreamingResult(result);
+      resultDestroyed = true;
+    }
+
+    try {
+      final loseAcknowledgement =
+          StreamingTestHooks._takeExecuteAcknowledgementLoss();
+      int? state;
+      try {
+        state = await connection._isolate
+            .execute(
+              ExecutePreparedStreamingOperation(
+                statementPointer: _handle.address,
+                resultCellPointer: result.address,
+                dropAcknowledgement: loseAcknowledgement,
+              ),
+            )
+            .$2;
+      } catch (error, stackTrace) {
+        if (!loseAcknowledgement) {
+          Error.throwWithStackTrace(error, stackTrace);
+        }
+      }
+
+      final nativeResult = result;
+
+      final handoffHook = StreamingTestHooks.beforeStreamingHandoff;
+      if (handoffHook != null) {
+        await handoffHook();
+      }
+
+      if (cancellationGate.isCancelled || connection._isClosed) {
+        await destroyUnexposedResult();
+        if (cancellationGate.isCancelled) {
+          throw DuckDBCancelledException('Operation cancelled');
+        }
+        throw StateError('Connection was closed during streaming execution');
+      }
+
+      final error = _bindings.duckdb_result_error(nativeResult);
+      if (state == duckdb_state.DuckDBError.value || !error.isNullPointer) {
+        final errorString = error.isNullPointer
+            ? 'Failed to execute prepared statement as a streaming result.'
+            : error.readString();
+        await destroyUnexposedResult();
+        throw DuckDBException(errorString);
+      }
+
+      if (loseAcknowledgement && _isStreamingResultCellEmpty(nativeResult)) {
+        throw StateError(
+          'Streaming execution acknowledgement was lost before a result was produced',
+        );
+      }
+
+      final isStreaming =
+          _bindings.duckdb_result_is_streaming(nativeResult.ref);
+      if (!isStreaming) {
+        if (requireNativeStreaming) {
+          await destroyUnexposedResult();
+          throw StateError(
+            'DuckDB returned a materialized result for a required native stream.',
+          );
+        }
+        connection._releasePendingStreamingLease();
+        final materialized = ResultSetImpl.withResult(nativeResult);
+        resultTransferred = true;
+        return materialized;
+      }
+
+      final metadata = _StreamingMetadata.read(_bindings, nativeResult);
+      if (cancellationGate.isCancelled || connection._isClosed) {
+        await destroyUnexposedResult();
+        if (cancellationGate.isCancelled) {
+          throw DuckDBCancelledException('Operation cancelled');
+        }
+        throw StateError('Connection was closed during streaming execution');
+      }
+
+      final resources = _StreamingResultResources(
+        connection,
+        _bindings,
+        nativeResult,
+        metadata,
+      );
+      connection._activateStreamingResult(resources);
+      resultTransferred = true;
+      return ResultSetImpl._withStreaming(resources, metadata, token);
+    } catch (_) {
+      if (!resultDestroyed && !resultTransferred) {
+        await destroyUnexposedResult();
+      }
+      if (!resultTransferred) {
+        connection._releasePendingStreamingLease();
+      }
+      if (cancellationGate.isCancelled) {
+        throw DuckDBCancelledException('Operation cancelled');
+      }
+      rethrow;
+    } finally {
+      cancellationGate.clear();
+    }
   }
 }
 
@@ -544,5 +776,32 @@ class ExecutePreparedOperation extends DatabaseOperation {
     }
 
     return result.address;
+  }
+}
+
+class ExecutePreparedStreamingOperation extends DatabaseOperation {
+  final int statementPointer;
+  final int resultCellPointer;
+  final bool _dropAcknowledgement;
+
+  const ExecutePreparedStreamingOperation({
+    required this.statementPointer,
+    required this.resultCellPointer,
+    bool dropAcknowledgement = false,
+  })  : _dropAcknowledgement = dropAcknowledgement,
+        super(connectionPointer: 0);
+
+  @override
+  bool get dropAcknowledgementForTesting => _dropAcknowledgement;
+
+  @override
+  Future<int> execute() async {
+    final bindings = (duckdb as DuckDB).bindings;
+    final statement =
+        Pointer<duckdb_prepared_statement>.fromAddress(statementPointer);
+    final result = Pointer<duckdb_result>.fromAddress(resultCellPointer);
+    return bindings
+        .duckdb_execute_prepared_streaming(statement.value, result)
+        .value;
   }
 }

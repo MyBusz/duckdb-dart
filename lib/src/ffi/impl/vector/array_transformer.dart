@@ -17,10 +17,6 @@ List<T?> arrayTransformer<T>(
   final childLogicalType = childHandle.logicalType();
 
   try {
-    final elementTransformer = getTransformerForType<T>(
-      childLogicalType.dataType,
-    );
-
     // Get array size from logical type
     final arraySize =
         bindings.duckdb_array_type_array_size(logicalType.handle.value);
@@ -45,13 +41,13 @@ List<T?> arrayTransformer<T>(
         if (validityMasks?.isElementNull(elementOffset) ?? false) {
           return null;
         }
-        return elementTransformer(
+        return transformLogicalVectorValue(
           bindings,
           childDataPtr,
           elementOffset,
           childHandle,
           childLogicalType,
-        );
+        ) as T?;
       },
       growable: false,
     );

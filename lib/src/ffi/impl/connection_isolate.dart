@@ -65,8 +65,22 @@ class ConnectionIsolate {
   // Track the currently executing operation ID (if any).
   String? _currentOperationId;
 
-  // Track the last cancelled operation ID
-  String? _lastCancelledId;
+  // Track the operation sent to the worker before its start acknowledgement.
+  //
+  // This remains distinct from [_currentOperationId]. Between dispatch and
+  // `_IsolateOperationStart`, an operation is no longer removable from the
+  // root queue, but DuckDB cannot yet safely be interrupted.
+  String? _dispatchedOperationId;
+
+  // One bounded start acknowledgement for each operation that has not yet
+  // started or otherwise settled. `true` means the worker acknowledged start;
+  // `false` means it completed, was removed, crashed, or was disposed first.
+  final _startCompleters = <String, Completer<bool>>{};
+
+  // Operations explicitly cancelled by a caller. Entries are removed on every
+  // terminal path so native response/error precedence cannot leak operation
+  // identities across the connection lifetime.
+  final _cancelledOperationIds = <String>{};
 
   // Maps operation IDs to their completion handlers
   final _responseCompleters = <String, Completer<int>>{};
@@ -80,6 +94,22 @@ class ConnectionIsolate {
 
   // Getter for currently executing operation ID
   String? get currentOperationId => _currentOperationId;
+
+  /// Returns the start acknowledgement for [operationId].
+  ///
+  /// `false` means that no start acknowledgement can arrive for this
+  /// operation. The future is intentionally internal bridge state, not a
+  /// public connection API.
+  Future<bool> startAcknowledgementFor(String operationId) {
+    return _startCompleters[operationId]?.future ?? Future<bool>.value(false);
+  }
+
+  /// Records an explicit cancellation before any queue or interrupt action.
+  void markOperationCancelled(String operationId) {
+    if (_responseCompleters.containsKey(operationId)) {
+      _cancelledOperationIds.add(operationId);
+    }
+  }
 
   /// Generates a new unique operation ID.
   String _nextOperationId() => _uuid.v4().substring(0, 8);
@@ -143,11 +173,8 @@ class ConnectionIsolate {
           }
 
           _clearPendingRequests();
-          if (_currentOperationId != null) {
-            final completer = _responseCompleters.remove(_currentOperationId);
-            completer?.completeError(StateError(error), stackTrace);
-            _currentOperationId = null;
-          }
+          _currentOperationId = null;
+          _dispatchedOperationId = null;
         }
       }
     });
@@ -175,39 +202,9 @@ class ConnectionIsolate {
 
     switch (message) {
       case _IsolateOperationStart(:final id):
-        _currentOperationId = id;
-        _log.fine('Operation $id started');
+        _acknowledgeOperationStart(id);
       case _IsolateResponse(:final id, :final error, :final result):
-        _log.fine('Handling response for $id');
-        _currentOperationId = null;
-
-        // Complete current operation
-        final completer = _responseCompleters.remove(id);
-        if (completer != null) {
-          if (error != null) {
-            completer.completeError(error);
-          } else if (id == _lastCancelledId) {
-            /// If the operation was cancelled while being sent to the connection
-            /// isolate, we need to complete the operation with a cancelled exception.
-            completer.completeError(
-              DuckDBCancelledException('Operation was cancelled'),
-            );
-          } else {
-            completer.complete(result);
-          }
-        } else {
-          _log.warning('No completer found for response $id');
-        }
-
-        // Remove completed operation and send next if available
-        if (_pendingOperations.isNotEmpty &&
-            _pendingOperations.first.id == id) {
-          _pendingOperations.removeFirst();
-          if (_pendingOperations.isNotEmpty) {
-            final nextOp = _pendingOperations.first;
-            _sendPort.send(_IsolateRequest(nextOp.id, nextOp.operation));
-          }
-        }
+        _completeOperationResponse(id, error: error, result: result);
       case SendPort():
         _log.fine('Received SendPort from isolate');
       case _IsolateShutdown():
@@ -215,6 +212,80 @@ class ConnectionIsolate {
       default:
         _log.warning('Received unknown message type: ${message?.runtimeType}');
     }
+  }
+
+  void _acknowledgeOperationStart(String id) {
+    final hook = ConnectionIsolateTestHooks.beforeOperationStartAcknowledgement;
+    if (hook == null) {
+      _completeOperationStart(id);
+      return;
+    }
+    unawaited(
+      Future<void>.sync(() => hook(id)).then<void>(
+        (_) => _completeOperationStart(id),
+        onError: (Object _, StackTrace __) => _completeOperationStart(id),
+      ),
+    );
+  }
+
+  void _completeOperationStart(String id) {
+    if (!_responseCompleters.containsKey(id) || _dispatchedOperationId != id) {
+      _settleStartAcknowledgement(id, started: false);
+      return;
+    }
+    _currentOperationId = id;
+    _settleStartAcknowledgement(id, started: true);
+    _log.fine('Operation $id started');
+  }
+
+  void _completeOperationResponse(
+    String id, {
+    required Object? error,
+    required int? result,
+  }) {
+    _log.fine('Handling response for $id');
+    if (_currentOperationId == id) _currentOperationId = null;
+    if (_dispatchedOperationId == id) _dispatchedOperationId = null;
+    _settleStartAcknowledgement(id, started: false);
+
+    final wasCancelled = _cancelledOperationIds.remove(id);
+    final completer = _responseCompleters.remove(id);
+    if (completer != null) {
+      if (wasCancelled) {
+        completer.completeError(
+          DuckDBCancelledException('Operation was cancelled'),
+        );
+      } else if (error != null) {
+        completer.completeError(error);
+      } else {
+        completer.complete(result);
+      }
+    } else {
+      _log.warning('No completer found for response $id');
+    }
+
+    if (_pendingOperations.isNotEmpty && _pendingOperations.first.id == id) {
+      _pendingOperations.removeFirst();
+    }
+    _dispatchNextIfIdle();
+  }
+
+  void _settleStartAcknowledgement(String id, {required bool started}) {
+    final completer = _startCompleters.remove(id);
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(started);
+    }
+  }
+
+  void _dispatchNextIfIdle() {
+    if (_currentOperationId != null ||
+        _dispatchedOperationId != null ||
+        _pendingOperations.isEmpty) {
+      return;
+    }
+    final operation = _pendingOperations.first;
+    _dispatchedOperationId = operation.id;
+    _sendPort.send(_IsolateRequest(operation.id, operation.operation));
   }
 
   static Future<void> _isolateFunction(
@@ -275,7 +346,18 @@ class ConnectionIsolate {
           log.fine(
             '[Isolate:$debugId] Completed request ${message.id} with result: $result',
           );
-          sendPort.send(_IsolateResponse(message.id, result: result));
+          if (message.operation.dropAcknowledgementForTesting) {
+            sendPort.send(
+              _IsolateResponse(
+                message.id,
+                error: StateError(
+                  'Test acknowledgement loss after native operation completion',
+                ),
+              ),
+            );
+          } else {
+            sendPort.send(_IsolateResponse(message.id, result: result));
+          }
         } catch (e, st) {
           log.severe(
             '[Isolate:$debugId] Error in request ${message.id}',
@@ -309,26 +391,26 @@ class ConnectionIsolate {
     Isolate.current.kill(priority: Isolate.immediate);
   }
 
-  /// Executes an operation and returns both the operation ID and future result.
-  (String id, Future<int> result) execute(DatabaseOperation operation) {
+  /// Executes an operation and returns its ID, result, and start handshake.
+  (String id, Future<int> result, Future<bool> startAcknowledgement) execute(
+    DatabaseOperation operation,
+  ) {
     if (!_IsolateRegistry.instance.isActive(_debugId)) {
       throw StateError('Isolate is disposed or shutting down');
     }
     final id = _nextOperationId();
     final completer = Completer<int>();
+    final startCompleter = Completer<bool>();
     _responseCompleters[id] = completer;
+    _startCompleters[id] = startCompleter;
 
     // Just add to pending queue - no immediate dispatch
     final pendingOp = _PendingOperation(id, operation, completer);
     _pendingOperations.add(pendingOp);
 
-    // If this is the first operation (no current operation), start it
-    if (_currentOperationId == null && _pendingOperations.length == 1) {
-      final op = _pendingOperations.first;
-      _sendPort.send(_IsolateRequest(op.id, op.operation));
-    }
+    _dispatchNextIfIdle();
 
-    return (id, completer.future);
+    return (id, completer.future, startCompleter.future);
   }
 
   void _clearPendingRequests() {
@@ -336,9 +418,13 @@ class ConnectionIsolate {
     while (_pendingOperations.isNotEmpty) {
       final op = _pendingOperations.removeFirst();
       final completer = _responseCompleters.remove(op.id);
-      completer?.completeError(
-        StateError('Connection is being disposed, operation interrupted'),
-      );
+      _cancelledOperationIds.remove(op.id);
+      _settleStartAcknowledgement(op.id, started: false);
+      if (completer != null && !completer.isCompleted) {
+        completer.completeError(
+          StateError('Connection is being disposed, operation interrupted'),
+        );
+      }
     }
     // Clear any remaining completers.
     final pendingCompleters = Map<String, Completer<int>>.from(
@@ -346,34 +432,51 @@ class ConnectionIsolate {
     );
     for (final entry in pendingCompleters.entries) {
       _log.fine('Clearing request ${entry.key}');
-      entry.value.completeError(
-        StateError('Connection is being disposed, operation interrupted'),
-      );
+      _cancelledOperationIds.remove(entry.key);
+      _settleStartAcknowledgement(entry.key, started: false);
+      if (!entry.value.isCompleted) {
+        entry.value.completeError(
+          StateError('Connection is being disposed, operation interrupted'),
+        );
+      }
       _responseCompleters.remove(entry.key);
     }
+    _currentOperationId = null;
+    _dispatchedOperationId = null;
+    _cancelledOperationIds.clear();
   }
 
-  /// Cancel a pending operation if it's still in the queue.
-  Future<void> cancelOperation(String operationId) async {
+  /// Cancels only a genuinely undispatched queued operation.
+  ///
+  /// Returns true only when the queue entry was removed. A dispatched request,
+  /// including the pre-start-acknowledgement window, is never removed because
+  /// the worker may already execute it.
+  Future<bool> cancelOperation(String operationId) async {
     if (!_IsolateRegistry.instance.isActive(_debugId)) {
       throw StateError('Isolate is disposed or shutting down');
     }
 
-    _lastCancelledId = operationId;
+    markOperationCancelled(operationId);
 
     // Check if the operation is still pending.
     final pendingOp =
         _pendingOperations.where((op) => op.id == operationId).firstOrNull;
-    if (pendingOp != null && _pendingOperations.last.id != operationId) {
+    if (pendingOp != null && _dispatchedOperationId != operationId) {
       _pendingOperations.remove(pendingOp);
       final completer = _responseCompleters.remove(operationId);
+      _cancelledOperationIds.remove(operationId);
+      _settleStartAcknowledgement(operationId, started: false);
       _log.fine(
         'Cancelled operation $operationId. Queue size: ${_pendingOperations.length}',
       );
-      completer?.completeError(
-        DuckDBCancelledException('Operation was cancelled'),
-      );
+      if (completer != null && !completer.isCompleted) {
+        completer.completeError(
+          DuckDBCancelledException('Operation was cancelled'),
+        );
+      }
+      return true;
     }
+    return false;
   }
 
   Future<void> dispose() async {
@@ -392,8 +495,9 @@ class ConnectionIsolate {
     _sendPort.send(const _IsolateShutdown());
 
     try {
-      if (_currentOperationId != null) {
-        final currentCompleter = _responseCompleters[_currentOperationId!];
+      final inFlightOperationId = _currentOperationId ?? _dispatchedOperationId;
+      if (inFlightOperationId != null) {
+        final currentCompleter = _responseCompleters[inFlightOperationId];
         if (currentCompleter != null) {
           await currentCompleter.future;
         }
@@ -419,12 +523,32 @@ class ConnectionIsolate {
   }
 }
 
+/// Root-isolate-only synchronization hooks for deterministic bridge tests.
+@visibleForTesting
+class ConnectionIsolateTestHooks {
+  /// Invoked after the worker has sent its start acknowledgement but before
+  /// the root records it as active. Reset this in test teardown.
+  @visibleForTesting
+  static Future<void> Function(String operationId)?
+      beforeOperationStartAcknowledgement;
+
+  /// Removes all installed hooks.
+  @visibleForTesting
+  static void reset() {
+    beforeOperationStartAcknowledgement = null;
+  }
+}
+
 /// Base class for database operations that can be executed in a [ConnectionIsolate].
 @immutable
 abstract class DatabaseOperation {
   final int connectionPointer;
 
   const DatabaseOperation({required this.connectionPointer});
+
+  /// Test-only response-loss simulation. The worker executes the operation,
+  /// then reports an error instead of the acknowledgement.
+  bool get dropAcknowledgementForTesting => false;
 
   Future<int> execute();
 }

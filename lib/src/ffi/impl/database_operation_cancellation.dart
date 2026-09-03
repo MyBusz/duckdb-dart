@@ -22,31 +22,67 @@ mixin DatabaseOperationCancellation {
       throw DuckDBCancelledException('Operation cancelled');
     }
 
-    final (operationId, operationFuture) = isolate.execute(operation);
+    final execution = isolate.execute(operation);
+    final operationId = execution.$1;
+    final operationFuture = execution.$2;
+    final startAcknowledgement = execution.$3;
+    final processedResult = processResult(operationFuture);
+
+    Future<T> operationHandler() async {
+      try {
+        final result = await processedResult;
+        if (token?.isCancelled ?? false) {
+          throw DuckDBCancelledException('Operation cancelled');
+        }
+        return result;
+      } on Object {
+        // An explicit cancellation always wins over a native error or result
+        // observed in the same dispatch/response turn.
+        if (token?.isCancelled ?? false) {
+          throw DuckDBCancelledException('Operation cancelled');
+        }
+        rethrow;
+      }
+    }
 
     Future<T> cancellationHandler() async {
       await token!.cancelled;
 
-      // Mark that we're cancelling before interrupting
-      final wasActive = isolate.currentOperationId == operationId;
-
-      if (wasActive) {
-        // Operation is currently active in the isolate
-        bindings.duckdb_interrupt(handle.value);
-      } else {
-        // Cancel the operation - the isolate will handle it if it hasn't started yet
-        await isolate.cancelOperation(operationId);
+      isolate.markOperationCancelled(operationId);
+      final removed = await isolate.cancelOperation(operationId);
+      if (removed) {
+        try {
+          await processedResult;
+        } on Object {
+          // The removed operation settles with cancellation below.
+        }
+        throw DuckDBCancelledException('Operation cancelled');
       }
 
-      // Let operationFuture's result/exception propagate
-      await operationFuture;
+      // The operation was dispatched and is therefore not safely removable.
+      // Wait only for a start acknowledgement or terminal response: no polling
+      // and no wait on a native COPY after it has already completed.
+      final started = await Future.any<bool>([
+        startAcknowledgement,
+        operationFuture.then<bool>(
+          (_) => false,
+          onError: (Object _, StackTrace __) => false,
+        ),
+      ]);
+      if (started && isolate.currentOperationId == operationId) {
+        bindings.duckdb_interrupt(handle.value);
+      }
 
-      // If we get here, the operation completed normally but was cancelled
+      try {
+        await processedResult;
+      } on Object {
+        // The cancellation terminal is deliberately authoritative.
+      }
       throw DuckDBCancelledException('Operation cancelled');
     }
 
     final result = await Future.any<T>([
-      processResult(operationFuture),
+      operationHandler(),
       if (token != null) cancellationHandler(),
     ]);
 

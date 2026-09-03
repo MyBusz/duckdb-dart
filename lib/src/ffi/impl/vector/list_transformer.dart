@@ -34,9 +34,6 @@ List<T?> listTransformer<T>(
     final validityMasks =
         validityMasksRaw.isNullPointer ? null : validityMasksRaw.cast<Uint64>();
 
-    final elementTransformer = getTransformerForType<T>(
-      childLogicalType.dataType,
-    );
     final childDataPtr = bindings.duckdb_vector_get_data(child);
 
     return List.generate(
@@ -57,13 +54,13 @@ List<T?> listTransformer<T>(
         }
 
         // Transform the element
-        return elementTransformer(
+        return transformLogicalVectorValue(
           bindings,
           childDataPtr,
           elementOffset,
           child,
           childLogicalType,
-        );
+        ) as T?;
       },
       growable: false,
     );
